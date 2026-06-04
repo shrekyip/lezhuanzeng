@@ -1,0 +1,59 @@
+/* 温暖人文设计系统 - 乐转赠 */
+@import "tailwindcss";
+
+@theme inline {
+  /* 主色调 - 温暖橙色 */
+  --color-primary: #e85d3a;
+  --color-primary-light: #fbe9e7;
+  --color-primary-dark: #c94d2e;
+  
+  /* 温暖中性色 - 替代冷灰色 */
+  --color-warm-50: #fefcfb;
+  --color-warm-100: #fdf5f0;
+  --color-warm-200: #f5e6d8;
+  --color-warm-300: #e8d0bc;
+  --color-warm-400: #d4b89a;
+  --color-warm-500: #b89a7d;
+  --color-warm-600: #8c7260;
+  --color-warm-700: #6b5649;
+  --color-warm-800: #4a3c33;
+  --color-warm-900: #2c2520;
+  
+  /* 强调色 - 温暖绿（代表希望/成长）*/
+  --color-accent: #5cb88a;
+  --color-accent-light: #e8f5e9;
+  
+  /* 字体 - 适合中文的系统字体堆栈 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono",
+    Menlo, Courier, monospace;
+}
+
+/* 温暖阴影 - 替代冷灰色阴影 */
+.shadow-warm-sm {
+  box-shadow: 0 1px 3px rgba(44, 37, 32, 0.06);
+}
+
+.shadow-warm-md {
+  box-shadow: 0 4px 12px rgba(44, 37, 32, 0.08);
+}
+
+.shadow-warm-lg {
+  box-shadow: 0 12px 32px rgba(44, 37, 32, 0.12);
+}
+
+/* 流畅过渡 */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* 温暖聚焦环 */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

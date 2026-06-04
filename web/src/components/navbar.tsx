@@ -1,0 +1,153 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import {
+  getCurrentUser,
+  getProfiles,
+  mockProfiles,
+  getUnreadCount,
+} from "@/lib/mock-data";
+import type { Profile } from "@/types";
+
+export default function Navbar() {
+  const [user, setUser] = useState<Profile>(mockProfiles[0]);
+  const [showSwitcher, setShowSwitcher] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const current = getCurrentUser();
+    setUser(current);
+    setUnread(getUnreadCount(current.id));
+  }, []);
+
+  if (!mounted) {
+    return (
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b border-neutral-100">
+        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+          <Link href="/" className="text-2xl font-bold text-primary">
+            乐转赠
+          </Link>
+        </div>
+      </header>
+    );
+  }
+
+  const switchUser = (id: string) => {
+    const p = getProfiles().find((p) => p.id === id);
+    if (p) {
+      setUser(p);
+      setUnread(getUnreadCount(p.id));
+      setShowSwitcher(false);
+    }
+  };
+
+  return (
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b border-neutral-100">
+      <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+        <Link href="/" className="text-2xl font-bold text-primary">
+          乐转赠
+        </Link>
+
+        <nav className="hidden md:flex items-center gap-6">
+          <Link
+            href="/browse"
+            className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
+          >
+            浏览物品
+          </Link>
+          <Link
+            href="/items/new"
+            className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
+          >
+            发布物品
+          </Link>
+          <Link
+            href="/dashboard"
+            className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors relative"
+          >
+            我的物品
+            {unread > 0 && (
+              <span className="absolute -top-1 -right-3 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
+                {unread}
+              </span>
+            )}
+          </Link>
+        </nav>
+
+        {/* User Switcher (MVP) */}
+        <div className="relative">
+          <button
+            onClick={() => setShowSwitcher(!showSwitcher)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-neutral-200 hover:border-neutral-300 transition-colors text-sm"
+          >
+            <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center">
+              {user.nickname[0]}
+            </div>
+            <span className="text-neutral-700">{user.nickname}</span>
+            <svg
+              className="w-3 h-3 text-neutral-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+
+          {showSwitcher && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-neutral-100 py-2">
+              <div className="px-3 py-1.5 text-xs text-neutral-400">
+                MVP 测试用户切换
+              </div>
+              {getProfiles().map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => switchUser(p.id)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-neutral-50 transition-colors ${
+                    user.id === p.id ? "text-primary font-medium" : "text-neutral-700"
+                  }`}
+                >
+                  <div className="w-6 h-6 rounded-full bg-neutral-100 text-neutral-500 text-xs flex items-center justify-center shrink-0">
+                    {p.nickname[0]}
+                  </div>
+                  {p.nickname}
+                  {user.id === p.id && " ✓"}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile Nav */}
+      <div className="md:hidden flex border-t border-neutral-100">
+        <Link
+          href="/browse"
+          className="flex-1 text-center py-2.5 text-xs text-neutral-500"
+        >
+          浏览
+        </Link>
+        <Link
+          href="/items/new"
+          className="flex-1 text-center py-2.5 text-xs text-neutral-500"
+        >
+          发布
+        </Link>
+        <Link
+          href="/dashboard"
+          className="flex-1 text-center py-2.5 text-xs text-neutral-500"
+        >
+          我的
+        </Link>
+      </div>
+    </header>
+  );
+}

@@ -4,44 +4,55 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  initMockData,
   getItem,
-  getProfile,
+  getCurrentUser,
   getApplicationsForItem,
   createApplication,
-  getCurrentUser,
-  mockProfiles,
-} from "@/lib/mock-data";
-import type { Item, Application } from "@/types";
+} from "@/lib/db";
+import type { Item, Application, Profile } from "@/types";
 
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [item, setItem] = useState<Item | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [currentUser, setCurrentUser] = useState(mockProfiles[0]);
+  const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [showApply, setShowApply] = useState(false);
   const [applyReason, setApplyReason] = useState("");
   const [applyAddress, setApplyAddress] = useState("");
   const [applyPhone, setApplyPhone] = useState("");
   const [applySubmitted, setApplySubmitted] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    initMockData();
-    const found = getItem(id);
-    setItem(found || null);
-    if (found) {
-      setApplications(getApplicationsForItem(found.id));
-    }
-    setCurrentUser(getCurrentUser());
-    setMounted(true);
+    const load = async () => {
+      const [found, user] = await Promise.all([
+        getItem(id),
+        getCurrentUser(),
+      ]);
+      setItem(found || null);
+      setCurrentUser(user);
+      if (found) {
+        setApplications(await getApplicationsForItem(found.id));
+      }
+      setLoading(false);
+    };
+    load();
   }, [id]);
 
-  if (!mounted || !item) {
+  if (loading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center text-neutral-400">
-        {!mounted ? "加载中..." : "物品不存在或已下架"}
+        加载中...
+      </div>
+    );
+  }
+
+  if (!item || !currentUser) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-20 text-center text-neutral-400">
+        物品不存在或已下架
       </div>
     );
   }
@@ -52,19 +63,26 @@ export default function ItemDetailPage() {
   );
   const imgUrl = item.images?.[0]?.url;
 
-  const handleApply = (e: React.FormEvent) => {
+  const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (applyReason.trim().length < 30) return;
 
-    createApplication({
-      item_id: item.id,
-      applicant_id: currentUser.id,
-      reason: applyReason,
-      address: applyAddress,
-      phone: applyPhone,
-    });
-    setApplySubmitted(true);
-    setApplications(getApplicationsForItem(item.id));
+    setSubmitting(true);
+    try {
+      await createApplication({
+        item_id: item.id,
+        applicant_id: currentUser.id,
+        reason: applyReason,
+        address: applyAddress,
+        phone: applyPhone,
+      });
+      setApplySubmitted(true);
+      setApplications(await getApplicationsForItem(item.id));
+    } catch (err) {
+      console.error('Apply error:', err);
+      alert('申领失败，请稍后重试');
+    }
+    setSubmitting(false);
   };
 
   return (
@@ -224,10 +242,10 @@ export default function ItemDetailPage() {
               </div>
               <button
                 type="submit"
-                disabled={applyReason.trim().length < 30 || !applyAddress || !applyPhone}
+                disabled={applyReason.trim().length < 30 || !applyAddress || !applyPhone || submitting}
                 className="w-full rounded-full bg-primary text-white py-2.5 text-sm font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                提交申领
+                {submitting ? "提交中..." : "提交申领"}
               </button>
             </form>
           )}

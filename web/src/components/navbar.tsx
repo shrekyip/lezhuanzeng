@@ -3,27 +3,37 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
+  getCurrentUserId,
+  setCurrentUserId,
   getCurrentUser,
   getProfiles,
-  mockProfiles,
   getUnreadCount,
-} from "@/lib/mock-data";
+  DEMO_USERS,
+} from "@/lib/db";
 import type { Profile } from "@/types";
 
 export default function Navbar() {
-  const [user, setUser] = useState<Profile>(mockProfiles[0]);
+  const [user, setUser] = useState<Profile | null>(null);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [unread, setUnread] = useState(0);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const current = getCurrentUser();
-    setUser(current);
-    setUnread(getUnreadCount(current.id));
+    const load = async () => {
+      const [currentUser, allProfiles] = await Promise.all([
+        getCurrentUser(),
+        getProfiles(),
+      ]);
+      setUser(currentUser);
+      setProfiles(allProfiles);
+      setUnread(await getUnreadCount(currentUser.id));
+      setMounted(true);
+    };
+    load();
   }, []);
 
-  if (!mounted) {
+  if (!mounted || !user) {
     return (
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b border-neutral-100">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -35,13 +45,12 @@ export default function Navbar() {
     );
   }
 
-  const switchUser = (id: string) => {
-    const p = getProfiles().find((p) => p.id === id);
-    if (p) {
-      setUser(p);
-      setUnread(getUnreadCount(p.id));
-      setShowSwitcher(false);
-    }
+  const switchUser = async (id: string) => {
+    setCurrentUserId(id);
+    const newUser = await getCurrentUser();
+    setUser(newUser);
+    setUnread(await getUnreadCount(newUser.id));
+    setShowSwitcher(false);
   };
 
   return (
@@ -107,7 +116,7 @@ export default function Navbar() {
               <div className="px-3 py-1.5 text-xs text-neutral-400">
                 MVP 测试用户切换
               </div>
-              {getProfiles().map((p) => (
+              {profiles.map((p) => (
                 <button
                   key={p.id}
                   onClick={() => switchUser(p.id)}

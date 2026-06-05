@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useState, useMemo } from "react";
+import { Suspense, useEffect, useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import ItemCard from "@/components/item-card";
-import { getItems, getCategories, initMockData } from "@/lib/mock-data";
+import { getItems, getCategories } from "@/lib/db";
 import type { Item, Category } from "@/types";
 
 function BrowseContent() {
@@ -15,9 +15,14 @@ function BrowseContent() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    initMockData();
-    setCategories(getCategories());
-    setMounted(true);
+    const loadData = async () => {
+      const cats = await getCategories();
+      setCategories(cats);
+      const allItems = await getItems();
+      setItems(allItems);
+      setMounted(true);
+    };
+    loadData();
   }, []);
 
   // Read URL params
@@ -28,13 +33,30 @@ function BrowseContent() {
     }
   }, [searchParams]);
 
-  // Filter items
+  // Filter items (client-side from loaded data)
   const filtered = useMemo(() => {
-    return getItems({
-      categoryId: selectedCat || undefined,
-      keyword: keyword || undefined,
-    });
-  }, [selectedCat, keyword, mounted]);
+    let result = [...items];
+
+    if (selectedCat) {
+      result = result.filter((i) => i.category_id === selectedCat);
+    }
+    if (keyword) {
+      const kw = keyword.toLowerCase();
+      result = result.filter(
+        (i) =>
+          i.title.toLowerCase().includes(kw) ||
+          i.description.toLowerCase().includes(kw) ||
+          i.tags.some((t) => t.toLowerCase().includes(kw))
+      );
+    }
+
+    return result;
+  }, [items, selectedCat, keyword]);
+
+  const handleRefresh = useCallback(async () => {
+    const allItems = await getItems();
+    setItems(allItems);
+  }, []);
 
   if (!mounted) {
     return (
@@ -68,6 +90,12 @@ function BrowseContent() {
             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-200 bg-white text-sm focus:outline-none focus:border-primary transition-colors"
           />
         </div>
+        <button
+          onClick={handleRefresh}
+          className="text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
+        >
+          刷新
+        </button>
         <span className="text-sm text-neutral-400">
           共 {filtered.length} 件物品
         </span>

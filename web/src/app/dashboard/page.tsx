@@ -4,42 +4,37 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import ItemCard from "@/components/item-card";
 import {
-  initMockData,
-  getItems,
-  getApplicationsByUser,
   getCurrentUser,
-  getProfiles,
-  mockProfiles,
-} from "@/lib/mock-data";
-import type { Item, Application } from "@/types";
+  getItemsByGiver,
+  getApplicationsByUser,
+} from "@/lib/db";
+import type { Item, Application, Profile } from "@/types";
 
 export default function DashboardPage() {
-  const [user, setUser] = useState(mockProfiles[0]);
+  const [user, setUser] = useState<Profile | null>(null);
   const [myItems, setMyItems] = useState<Item[]>([]);
   const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [tab, setTab] = useState<"items" | "applications">("items");
-  const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    initMockData();
-    const current = getCurrentUser();
-    setUser(current);
+    const load = async () => {
+      const currentUser = await getCurrentUser();
+      setUser(currentUser);
 
-    // Get user's items
-    const allItems = getItems();
-    const userItems = allItems.filter(
-      (i) => i.giver_id === current.id || i.status !== "active"
-    );
-    // Actually, getItems only returns active items. Let me get from the full list
-    const allData = (window as any).__mockItems || [];
-    setMyItems(
-      allItems.filter((i) => i.giver_id === current.id)
-    );
-    setMyApplications(getApplicationsByUser(current.id));
-    setMounted(true);
+      const [items, apps] = await Promise.all([
+        getItemsByGiver(currentUser.id),
+        getApplicationsByUser(currentUser.id),
+      ]);
+
+      setMyItems(items);
+      setMyApplications(apps);
+      setLoading(false);
+    };
+    load();
   }, []);
 
-  if (!mounted) {
+  if (loading || !user) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-20 text-center text-neutral-400">
         加载中...

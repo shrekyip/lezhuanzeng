@@ -3,19 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  initMockData,
   getCategories,
   getCurrentUser,
   createItem,
-  getProfile,
-  mockProfiles,
-} from "@/lib/mock-data";
-import type { Category } from "@/types";
+} from "@/lib/db";
+import type { Category, Profile } from "@/types";
 
 export default function NewItemPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [currentUser, setCurrentUser] = useState(mockProfiles[0]);
+  const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<number>(0);
@@ -23,18 +20,24 @@ export default function NewItemPage() {
   const [city, setCity] = useState("");
   const [tags, setTags] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    initMockData();
-    setCategories(getCategories());
-    setCurrentUser(getCurrentUser());
-    setCategoryId(1);
-    setMounted(true);
+    const load = async () => {
+      const [cats, user] = await Promise.all([
+        getCategories(),
+        getCurrentUser(),
+      ]);
+      setCategories(cats);
+      setCurrentUser(user);
+      setCategoryId(cats[0]?.id || 1);
+      setLoading(false);
+    };
+    load();
   }, []);
 
-  if (!mounted) {
+  if (loading || !currentUser) {
     return (
       <div className="max-w-xl mx-auto px-4 py-20 text-center text-neutral-400">
         加载中...
@@ -42,7 +45,7 @@ export default function NewItemPage() {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -60,23 +63,27 @@ export default function NewItemPage() {
     }
 
     setSubmitting(true);
-
-    const newItem = createItem({
-      giver_id: currentUser.id,
-      category_id: categoryId,
-      title: title.trim(),
-      description: description.trim(),
-      condition,
-      tags: tags
-        .split(/[,，、\s]+/)
-        .filter((t) => t.trim())
-        .map((t) => t.trim()),
-      city: city.trim(),
-      status: "active",
-      applicant_count: 0,
-    });
-
-    router.push(`/items/${newItem.id}`);
+    try {
+      const newItem = await createItem({
+        giver_id: currentUser.id,
+        category_id: categoryId,
+        title: title.trim(),
+        description: description.trim(),
+        condition,
+        tags: tags
+          .split(/[,，、\s]+/)
+          .filter((t) => t.trim())
+          .map((t) => t.trim()),
+        city: city.trim(),
+        status: "active",
+        applicant_count: 0,
+      });
+      router.push(`/items/${newItem.id}`);
+    } catch (err) {
+      console.error('Create item error:', err);
+      setError("发布失败，请稍后重试");
+      setSubmitting(false);
+    }
   };
 
   return (

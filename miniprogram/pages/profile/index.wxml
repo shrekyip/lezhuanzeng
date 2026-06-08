@@ -1,0 +1,2 @@
+<!-- pages/profile/index.wxml - 我的页面 -->
+<web-view src="{{url}}" bindmessage="onMessage" binderror="onError"></web-view>

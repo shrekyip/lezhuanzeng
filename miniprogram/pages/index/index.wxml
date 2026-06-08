@@ -1,0 +1,2 @@
+<!-- pages/index/index.wxml - 首页（嵌入落地页） -->
+<web-view src="{{url}}" bindmessage="onMessage" bindload="onLoad" binderror="onError"></web-view>

@@ -1,0 +1,11 @@
+/* app.wxss - 全局样式 */
+page {
+  background-color: #F5F5F0;
+  font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  color: #1a1a1a;
+}
+
+.webview-container {
+  width: 100%;
+  height: 100vh;
+}

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>乐转赠 Logo 预览</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f5f5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+  h1 {
+    font-size: 24px;
+    color: #333;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    color: #888;
+    font-size: 14px;
+    margin-bottom: 40px;
+  }
+
+  /* Phone mockup */
+  .phone-mockup {
+    width: 375px;
+    background: #fff;
+    border-radius: 40px;
+    padding: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15), inset 0 0 0 2px #e0e0e0;
+    margin-bottom: 40px;
+  }
+  .phone-screen {
+    background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+    border-radius: 30px;
+    padding: 40px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 500px;
+  }
+  .phone-screen .logo-placeholder {
+    width: 144px;
+    height: 144px;
+    border-radius: 32px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(255, 107, 53, 0.3);
+    margin-bottom: 16px;
+  }
+  .phone-screen .logo-placeholder img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .phone-screen .app-name {
+    font-size: 28px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 4px;
+  }
+  .phone-screen .app-slogan {
+    font-size: 14px;
+    color: #999;
+    margin-bottom: 30px;
+  }
+  .phone-screen .app-btn {
+    background: #FF6B35;
+    color: white;
+    border: none;
+    padding: 14px 60px;
+    border-radius: 50px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
+  }
+  .phone-screen .status-bar {
+    width: 100%;
+    height: 20px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 12px;
+    color: #666;
+    font-weight: 600;
+  }
+  .phone-screen .home-indicator {
+    width: 134px;
+    height: 5px;
+    background: #333;
+    border-radius: 100px;
+    margin-top: auto;
+  }
+
+  /* Size comparison */
+  .size-grid {
+    display: flex;
+    gap: 30px;
+    align-items: flex-end;
+    background: white;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    margin-bottom: 40px;
+  }
+  .size-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .size-item .frame {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #eee;
+    border-radius: 22%;
+    overflow: hidden;
+    background: white;
+  }
+  .size-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .size-item .label {
+    font-size: 12px;
+    color: #999;
+    text-align: center;
+  }
+  .size-item .label strong {
+    display: block;
+    color: #333;
+    font-size: 14px;
+  }
+
+  /* Tab bar mockup */
+  .tabbar-mockup {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    margin-bottom: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  .tabbar-mockup h2 { font-size: 18px; color: #333; }
+  .tabbar {
+    display: flex;
+    gap: 0;
+    background: #fafafa;
+    border-radius: 12px;
+    padding: 8px 4px;
+    border: 1px solid #eee;
+  }
+  .tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 20px;
+  }
+  .tab-item .tab-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .tab-item .tab-icon img { width: 100%; height: 100%; object-fit: cover; }
+  .tab-item .tab-label { font-size: 10px; color: #999; }
+  .tab-item.active .tab-label { color: #FF6B35; font-weight: 600; }
+
+  /* Browser tab mockup */
+  .browser-mockup {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .browser-mockup h2 { font-size: 18px; color: #333; align-self: center; }
+  .browser-bar {
+    background: #f0f0f0;
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .browser-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+  }
+  .browser-dot.r { background: #ff5f57; }
+  .browser-dot.y { background: #febc2e; }
+  .browser-dot.g { background: #28c840; }
+  .browser-url {
+    flex: 1;
+    background: white;
+    border-radius: 6px;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #333;
+  }
+  .browser-favicon {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .browser-favicon img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Navbar mockup */
+  .navbar-mockup {
+    background: white;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+  }
+  .navbar-mockup h2 { font-size: 18px; color: #333; }
+  .navbar-row {
+    background: #ff6b35;
+    padding: 12px 24px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 600px;
+  }
+  .navbar-row .nav-logo {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .navbar-row .nav-logo img { width: 100%; height: 100%; object-fit: cover; }
+  .navbar-row .nav-text {
+    color: white;
+    font-weight: 700;
+    font-size: 18px;
+  }
+  .navbar-row .nav-links {
+    margin-left: auto;
+    display: flex;
+    gap: 20px;
+  }
+  .navbar-row .nav-links a {
+    color: rgba(255,255,255,0.8);
+    font-size: 14px;
+    text-decoration: none;
+  }
+</style>
+</head>
+<body>
+
+<h1>乐转赠 Logo - Option B</h1>
+<p class="subtitle">礼盒 + 心形丝带 — 传递赠予的惊喜与温暖</p>
+
+<!-- Phone mockup -->
+<div class="phone-mockup">
+  <div class="phone-screen">
+    <div class="status-bar">
+      <span>18:24</span>
+      <span>&#9679;&#9679;&#9679;&#9679;</span>
+    </div>
+    <div class="logo-placeholder">
+      <img src="option-b-144.png" alt="Logo">
+    </div>
+    <div class="app-name">乐转赠</div>
+    <div class="app-slogan">让赠与带来快乐</div>
+    <button class="app-btn">开始</button>
+    <div class="home-indicator"></div>
+  </div>
+</div>
+
+<!-- Size comparison -->
+<div class="size-grid">
+  <div class="size-item">
+    <div class="frame" style="width:144px;height:144px;">
+      <img src="option-b-144.png" alt="144px">
+    </div>
+    <div class="label"><strong>144×144</strong>小程序/应用图标</div>
+  </div>
+  <div class="size-item">
+    <div class="frame" style="width:72px;height:72px;">
+      <img src="option-b-144.png" alt="72px">
+    </div>
+    <div class="label"><strong>72×72</strong>TabBar 图标</div>
+  </div>
+  <div class="size-item">
+    <div class="frame" style="width:48px;height:48px;">
+      <img src="option-b-144.png" alt="48px">
+    </div>
+    <div class="label"><strong>48×48</strong>导航栏</div>
+  </div>
+  <div class="size-item">
+    <div class="frame" style="width:32px;height:32px;">
+      <img src="option-b-144.png" alt="32px">
+    </div>
+    <div class="label"><strong>32×32</strong>Favicon</div>
+  </div>
+  <div class="size-item">
+    <div class="frame" style="width:16px;height:16px;">
+      <img src="option-b-144.png" alt="16px">
+    </div>
+    <div class="label"><strong>16×16</strong>最小图标</div>
+  </div>
+</div>
+
+<!-- Tab bar mockup -->
+<div class="tabbar-mockup">
+  <h2>小程序底部 TabBar 效果</h2>
+  <div class="tabbar">
+    <div class="tab-item">
+      <div class="tab-icon"><img src="option-b-144.png" alt=""></div>
+      <span class="tab-label">首页</span>
+    </div>
+    <div class="tab-item">
+      <div class="tab-icon"><img src="option-b-144.png" alt=""></div>
+      <span class="tab-label">浏览</span>
+    </div>
+    <div class="tab-item active">
+      <div class="tab-icon"><img src="option-b-144.png" alt=""></div>
+      <span class="tab-label">发布</span>
+    </div>
+    <div class="tab-item">
+      <div class="tab-icon"><img src="option-b-144.png" alt=""></div>
+      <span class="tab-label">我的</span>
+    </div>
+  </div>
+</div>
+
+<!-- Browser favicon -->
+<div class="browser-mockup">
+  <h2>浏览器标签页效果</h2>
+  <div class="browser-bar">
+    <div class="browser-dot r"></div>
+    <div class="browser-dot y"></div>
+    <div class="browser-dot g"></div>
+    <div class="browser-url">
+      <div class="browser-favicon"><img src="option-b-144.png" alt=""></div>
+      lezhuanzeng.com
+    </div>
+  </div>
+</div>
+
+<!-- Navbar mockup -->
+<div class="navbar-mockup">
+  <h2>网站导航栏效果</h2>
+  <div class="navbar-row">
+    <div class="nav-logo"><img src="option-b-144.png" alt=""></div>
+    <span class="nav-text">乐转赠</span>
+    <div class="nav-links">
+      <a href="#">浏览</a>
+      <a href="#">发布</a>
+      <a href="#">我的</a>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

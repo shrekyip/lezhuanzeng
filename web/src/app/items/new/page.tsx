@@ -22,6 +22,7 @@ export default function NewItemPage() {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [compressing, setCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Image state
@@ -49,8 +50,6 @@ export default function NewItemPage() {
       </div>
     );
   }
-
-  const [compressing, setCompressing] = useState(false);
 
   // ===== 客户端图片压缩（目标 < 1MB）=====
   const MAX_IMAGE_SIZE = 1024 * 1024; // 1MB

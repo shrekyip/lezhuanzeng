@@ -166,8 +166,34 @@ export async function getItemsByGiver(giverId: string): Promise<Item[]> {
   }));
 }
 
+// ===== 图片上传（Supabase Storage）=====
+
+const STORAGE_BUCKET = 'item-images';
+
+export async function uploadItemImage(file: File): Promise<string> {
+  const supabase = createClient();
+  const ext = file.name.split('.').pop() || 'jpg';
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const filePath = fileName;
+
+  const { data, error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+  if (error) throw error;
+
+  const { data: urlData } = supabase.storage
+    .from(STORAGE_BUCKET)
+    .getPublicUrl(filePath);
+
+  return urlData.publicUrl;
+}
+
 export async function createItem(
-  data: Omit<Item, 'id' | 'created_at' | 'images' | 'giver' | 'view_count' | 'category_name'>
+  data: Omit<Item, 'id' | 'created_at' | 'images' | 'giver' | 'view_count' | 'category_name'> & { imageFiles?: File[] }
 ): Promise<Item> {
   const supabase = createClient();
 
@@ -192,6 +218,22 @@ export async function createItem(
     .single();
 
   if (error) throw error;
+
+  // Upload images if provided
+  if (data.imageFiles && data.imageFiles.length > 0) {
+    for (let i = 0; i < data.imageFiles.length; i++) {
+      try {
+        const url = await uploadItemImage(data.imageFiles[i]);
+        await supabase.from('item_images').insert({
+          item_id: item.id,
+          url,
+          sort_order: i,
+        });
+      } catch (imgErr) {
+        console.error(`Failed to upload image ${i}:`, imgErr);
+      }
+    }
+  }
 
   const categories = await getCategories();
   const cat = categories.find((c) => c.id === item.category_id);

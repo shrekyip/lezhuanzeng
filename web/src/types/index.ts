@@ -61,6 +61,7 @@ export interface Application {
   status: ApplicationStatus;
   created_at: string;
   applicant?: Profile;
+  item?: Item;
 }
 
 export type ApplicationStatus = 'pending' | 'withdrawn' | 'rejected' | 'accepted' | 'cancelled';
@@ -74,6 +75,9 @@ export interface Feedback {
   thank_letter: string;
   quality: 'pending' | 'good' | 'poor';
   submitted_at: string;
+  created_at?: string;
+  is_public?: boolean;
+  applicant?: Profile;
   images?: FeedbackImage[];
 }
 

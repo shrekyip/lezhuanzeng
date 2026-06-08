@@ -168,6 +168,21 @@ export default function DashboardPage() {
                     提交于{" "}
                     {new Date(app.created_at).toLocaleDateString("zh-CN")}
                   </p>
+                  {/* 提交反馈按钮（被选中且物品未完成时显示） */}
+                  {app.status === "accepted" && app.item?.status !== 'completed' && (
+                    <Link
+                      href={`/feedback/new?item=${app.item_id}`}
+                      className="mt-3 inline-block text-sm text-orange-500 hover:text-orange-600 font-medium"
+                    >
+                      ✍️ 提交感谢信 →
+                    </Link>
+                  )}
+                  {/* 已提交反馈的提示 */}
+                  {app.item?.status === 'completed' && (
+                    <p className="mt-3 text-sm text-green-600 font-medium">
+                      ✅ 已提交反馈
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

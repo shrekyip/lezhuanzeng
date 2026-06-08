@@ -8,6 +8,8 @@ import {
   getCurrentUser,
   getApplicationsForItem,
   createApplication,
+  getFeedbackForItem,
+  rateFeedback,
 } from "@/lib/db";
 import type { Item, Application, Profile } from "@/types";
 
@@ -16,6 +18,7 @@ export default function ItemDetailPage() {
   const router = useRouter();
   const [item, setItem] = useState<Item | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [feedback, setFeedback] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [showApply, setShowApply] = useState(false);
   const [applyReason, setApplyReason] = useState("");
@@ -35,6 +38,10 @@ export default function ItemDetailPage() {
       setCurrentUser(user);
       if (found) {
         setApplications(await getApplicationsForItem(found.id));
+        // 如果物品已完成，加载反馈
+        if (found.status === 'completed') {
+          setFeedback(await getFeedbackForItem(found.id));
+        }
       }
       setLoading(false);
     };
@@ -289,6 +296,83 @@ export default function ItemDetailPage() {
                 </div>
               ))}
           </div>
+        </section>
+      )}
+
+      {/* Feedback display (giver only, after completed) */}
+      {isGiver && feedback.length > 0 && (
+        <section className="mt-12">
+          <h2 className="text-lg font-bold text-neutral-900 mb-6">
+            💝 收到的感谢信
+          </h2>
+          {feedback.map((fb) => (
+            <div key={fb.id} className="bg-orange-50/50 rounded-2xl p-6 border border-orange-100">
+              {/* 感谢信内容 */}
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 text-sm flex items-center justify-center font-medium flex-shrink-0">
+                  {fb.applicant?.nickname?.[0] || '?'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-neutral-900">
+                    {fb.applicant?.nickname}
+                  </p>
+                  <p className="text-xs text-neutral-400">
+                    {new Date(fb.submitted_at || fb.created_at).toLocaleDateString('zh-CN')}
+                  </p>
+                </div>
+                {/* 反馈质量标记 */}
+                {fb.quality === 'good' && (
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                    ✅ 优质反馈
+                  </span>
+                )}
+                {fb.quality === 'poor' && (
+                  <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">
+                    ⚠️ 反馈敷衍
+                  </span>
+                )}
+              </div>
+
+              <div className="bg-white rounded-xl p-4 text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap mb-4">
+                {fb.thank_letter}
+              </div>
+
+              {/* 反馈图片 */}
+              {fb.images && fb.images.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {fb.images.map((img: any, i: number) => (
+                    <div key={img.id} className="aspect-square rounded-lg overflow-hidden bg-neutral-100">
+                      <img src={img.url} alt={`反馈照片 ${i + 1}`} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 评价按钮（仅 pending 状态可评价） */}
+              {fb.quality === 'pending' && (
+                <div className="flex gap-3">
+                  <button
+                    onClick={async () => {
+                      await rateFeedback(fb.id, 'good', item.giver_id, fb.applicant_id, item.id);
+                      setFeedback(prev => prev.map(f => f.id === fb.id ? { ...f, quality: 'good' } : f));
+                    }}
+                    className="flex-1 py-2 bg-green-50 text-green-700 rounded-lg text-sm hover:bg-green-100 transition-colors"
+                  >
+                    🌸 送小红花（优质反馈）
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await rateFeedback(fb.id, 'poor', item.giver_id, fb.applicant_id, item.id);
+                      setFeedback(prev => prev.map(f => f.id === fb.id ? { ...f, quality: 'poor' } : f));
+                    }}
+                    className="flex-1 py-2 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100 transition-colors"
+                  >
+                    反馈敷衍
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
         </section>
       )}
     </div>

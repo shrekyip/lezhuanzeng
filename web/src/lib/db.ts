@@ -275,7 +275,8 @@ export async function getApplicationsByUser(userId: string): Promise<Application
     .from('applications')
     .select(`
       *,
-      applicant:profiles(*)
+      applicant:profiles(*),
+      item:items(*)
     `)
     .eq('applicant_id', userId)
     .order('created_at', { ascending: false });
@@ -359,41 +360,6 @@ export async function getFeedbackForItem(itemId: string): Promise<Feedback[]> {
   return (data || []) as Feedback[];
 }
 
-export async function createFeedback(data: {
-  item_id: string;
-  applicant_id: string;
-  giver_id: string;
-  thank_letter: string;
-  image_urls: string[];
-  is_public: boolean;
-}): Promise<void> {
-  const supabase = createClient();
-
-  const { data: fb, error: fbError } = await supabase
-    .from('feedback')
-    .insert({
-      item_id: data.item_id,
-      applicant_id: data.applicant_id,
-      giver_id: data.giver_id,
-      thank_letter: data.thank_letter,
-      is_public: data.is_public,
-    })
-    .select()
-    .single();
-
-  if (fbError || !fb) throw fbError || new Error('Failed to create feedback');
-
-  // Insert feedback images
-  if (data.image_urls.length > 0) {
-    await supabase.from('feedback_images').insert(
-      data.image_urls.map((url) => ({ feedback_id: fb.id, url }))
-    );
-  }
-
-  // Update item status to completed
-  await supabase.from('items').update({ status: 'completed' }).eq('id', data.item_id);
-}
-
 // ===== 通知 =====
 
 export async function getUserNotifications(userId: string): Promise<Notification[]> {
@@ -423,4 +389,120 @@ export async function getUnreadCount(userId: string): Promise<number> {
 
   if (error) return 0;
   return count || 0;
+}
+
+// ===== 反馈模块（新增/修改）=====
+
+// getItemById 别名（供反馈页使用）
+export async function getItemById(id: string): Promise<Item | undefined> {
+  return getItem(id);
+}
+
+// 创建反馈（先创建记录，返回 feedback id 供上传图片使用）
+export async function createFeedback(data: {
+  itemId: string;
+  applicantId: string;
+  giverId: string;
+  thankLetter: string;
+}): Promise<{ id: string }> {
+  const supabase = createClient();
+
+  const { data: fb, error: fbError } = await supabase
+    .from('feedback')
+    .insert({
+      item_id: data.itemId,
+      applicant_id: data.applicantId,
+      giver_id: data.giverId,
+      thank_letter: data.thankLetter,
+      is_public: false,
+    })
+    .select('id')
+    .single();
+
+  if (fbError || !fb) throw fbError || new Error('创建反馈失败');
+
+  // 更新物品状态为 completed
+  await supabase
+    .from('items')
+    .update({ status: 'completed' })
+    .eq('id', data.itemId);
+
+  return { id: fb.id };
+}
+
+// 上传反馈图片到 Supabase Storage
+export async function uploadFeedbackImage(
+  feedbackId: string,
+  file: File,
+  sortOrder: number
+): Promise<void> {
+  const supabase = createClient();
+
+  // 生成文件名
+  const fileExt = file.name.split('.').pop() || 'jpg';
+  const fileName = `${feedbackId}_${Date.now()}.${fileExt}`;
+  const filePath = `feedback/${feedbackId}/${fileName}`;
+
+  // 上传到 Storage
+  const { error: uploadError } = await supabase.storage
+    .from('item-images') // 复用已有 bucket
+    .upload(filePath, file, { upsert: true });
+
+  if (uploadError) throw uploadError;
+
+  // 获取公开 URL
+  const { data: urlData } = supabase.storage
+    .from('item-images')
+    .getPublicUrl(filePath);
+
+  // 写入 feedback_images 表
+  await supabase.from('feedback_images').insert({
+    feedback_id: feedbackId,
+    url: urlData.publicUrl,
+  });
+}
+
+// 赠主评价反馈质量（送小红花）
+export async function rateFeedback(
+  feedbackId: string,
+  quality: 'good' | 'poor',
+  giverId: string,
+  applicantId: string,
+  itemId: string
+): Promise<void> {
+  const supabase = createClient();
+
+  // 更新反馈质量
+  await supabase
+    .from('feedback')
+    .update({ quality })
+    .eq('id', feedbackId);
+
+  // 如果是 good，给赠主送一朵小红花
+  if (quality === 'good') {
+    const { error: insertError } = await supabase.from('red_flowers').insert({
+      giver_id: giverId,
+      sender_id: applicantId,
+      item_id: itemId,
+    });
+
+    // 忽略重复送花错误（唯一约束）
+    if (insertError && !insertError.message.includes('duplicate')) {
+      throw insertError;
+    }
+
+    // 直接更新赠主的小红花计数
+    const { data: current } = await supabase
+      .from('profiles')
+      .select('red_flowers')
+      .eq('id', giverId)
+      .single();
+
+    if (current) {
+      await supabase
+        .from('profiles')
+        .update({ red_flowers: (current.red_flowers || 0) + 1 })
+        .eq('id', giverId);
+    }
+  }
 }

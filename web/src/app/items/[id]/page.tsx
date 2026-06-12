@@ -10,6 +10,7 @@ import {
   createApplication,
   getFeedbackForItem,
   rateFeedback,
+  selectApplicant,
 } from "@/lib/db";
 import type { Item, Application, Profile } from "@/types";
 
@@ -27,6 +28,7 @@ export default function ItemDetailPage() {
   const [applySubmitted, setApplySubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [selecting, setSelecting] = useState<string | null>(null); // applicationId being selected
 
   useEffect(() => {
     const load = async () => {
@@ -70,8 +72,29 @@ export default function ItemDetailPage() {
   );
   const imgUrl = item.images?.[0]?.url;
 
-  const handleApply = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSelectApplicant = async (applicationId: string) => {
+    if (!item || selecting) return;
+    if (!confirm('确认选择这位申领者？其他申领者将会被婉拒。')) return;
+    setSelecting(applicationId);
+    try {
+      await selectApplicant(applicationId, item.id);
+      // Update local state
+      setItem((prev) => prev ? { ...prev, status: 'selected' } : prev);
+      setApplications((prev) =>
+        prev.map((a) =>
+          a.id === applicationId
+            ? { ...a, status: 'accepted' }
+            : { ...a, status: a.status === 'pending' ? 'rejected' : a.status }
+        )
+      );
+    } catch (err) {
+      console.error('Select error:', err);
+      alert('操作失败，请重试');
+    }
+    setSelecting(null);
+  };
+
+  const handleApply = async (e: React.FormEvent) => {    e.preventDefault();
     if (applyReason.trim().length < 30) return;
 
     setSubmitting(true);
@@ -263,38 +286,65 @@ export default function ItemDetailPage() {
       {isGiver && applications.length > 0 && (
         <section className="mt-12">
           <h2 className="text-lg font-bold text-neutral-900 mb-4">
-            申领者列表 ({applications.filter(a => a.status === 'pending').length})
+            申领者列表 ({applications.filter(a => a.status === 'pending').length} 人等待中)
           </h2>
+          {item.status === 'selected' && (
+            <div className="mb-4 bg-green-50 border border-green-100 rounded-xl px-4 py-3 text-sm text-green-700">
+              ✅ 已选定申领者，等待对方收货并提交反馈
+            </div>
+          )}
           <div className="space-y-3">
-            {applications
-              .filter((a) => a.status === "pending")
-              .map((app) => (
-                <div
-                  key={app.id}
-                  className="bg-white rounded-xl border border-neutral-100 p-4"
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-full bg-neutral-200 text-neutral-500 text-xs flex items-center justify-center font-medium">
-                      {app.applicant?.nickname?.[0] || "?"}
-                    </div>
-                    <div>
+            {applications.map((app) => (
+              <div
+                key={app.id}
+                className={`bg-white rounded-xl border p-4 transition-all ${
+                  app.status === 'accepted'
+                    ? 'border-green-300 bg-green-50/50'
+                    : app.status === 'rejected'
+                    ? 'border-neutral-100 opacity-50'
+                    : 'border-neutral-100'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-neutral-200 text-neutral-500 text-xs flex items-center justify-center font-medium flex-shrink-0">
+                    {app.applicant?.nickname?.[0] || "?"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
                       <p className="text-sm font-medium text-neutral-900">
                         {app.applicant?.nickname}
                       </p>
-                      <p className="text-xs text-neutral-400">
-                        信用分 {app.applicant?.trust_score} · 已完闭环{" "}
-                        {app.applicant?.completed_cycles}次
-                      </p>
+                      {app.status === 'accepted' && (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✓ 已选中</span>
+                      )}
+                      {app.status === 'rejected' && (
+                        <span className="text-xs bg-neutral-100 text-neutral-400 px-2 py-0.5 rounded-full">已婉拒</span>
+                      )}
                     </div>
+                    <p className="text-xs text-neutral-400 mb-2">
+                      信用分 {app.applicant?.trust_score ?? 0} · 已完闭环 {app.applicant?.completed_cycles ?? 0} 次
+                    </p>
+                    <p className="text-sm text-neutral-600 leading-relaxed bg-neutral-50 rounded-lg p-3">
+                      {app.reason}
+                    </p>
+                    <p className="text-xs text-neutral-400 mt-2">
+                      收件：{app.address} · {app.phone}
+                    </p>
                   </div>
-                  <p className="text-sm text-neutral-600 leading-relaxed bg-neutral-50 rounded-lg p-3">
-                    {app.reason}
-                  </p>
-                  <p className="text-xs text-neutral-400 mt-2">
-                    地址：{app.address} · 电话：{app.phone}
-                  </p>
                 </div>
-              ))}
+
+                {/* 选择按钮（仅物品 active 且此申领 pending 时显示） */}
+                {item.status === 'active' && app.status === 'pending' && (
+                  <button
+                    onClick={() => handleSelectApplicant(app.id)}
+                    disabled={selecting !== null}
+                    className="mt-3 w-full py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {selecting === app.id ? '处理中...' : '选择 TA 作为受赠者'}
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </section>
       )}

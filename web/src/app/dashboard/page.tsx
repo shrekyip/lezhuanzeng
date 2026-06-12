@@ -7,6 +7,8 @@ import {
   getCurrentUser,
   getItemsByGiver,
   getApplicationsByUser,
+  DEMO_USERS,
+  setCurrentUserId,
 } from "@/lib/db";
 import type { Item, Application, Profile } from "@/types";
 
@@ -49,7 +51,7 @@ export default function DashboardPage() {
         <div className="w-14 h-14 rounded-full bg-primary text-white text-2xl flex items-center justify-center font-bold">
           {user.nickname[0]}
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-neutral-900">
             {user.nickname}
           </h1>
@@ -60,6 +62,24 @@ export default function DashboardPage() {
             <span>·</span>
             <span>小红花 🌸{user.red_flowers}</span>
           </div>
+        </div>
+        {/* 开发阶段：用户切换器 */}
+        <div className="flex-shrink-0">
+          <select
+            value={user.id}
+            onChange={(e) => {
+              setCurrentUserId(e.target.value);
+              window.location.reload();
+            }}
+            className="text-xs border border-neutral-200 rounded-lg px-2 py-1 text-neutral-500 bg-neutral-50"
+            title="切换演示用户（开发用）"
+          >
+            {DEMO_USERS.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nickname}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -132,57 +152,68 @@ export default function DashboardPage() {
                   key={app.id}
                   className="bg-white rounded-xl border border-neutral-100 p-4"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <Link
-                      href={`/items/${app.item_id}`}
-                      className="text-sm font-medium text-neutral-900 hover:text-primary transition-colors"
-                    >
-                      查看物品 →
-                    </Link>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        app.status === "pending"
-                          ? "bg-amber-50 text-amber-600"
-                          : app.status === "accepted"
-                          ? "bg-green-50 text-green-600"
-                          : app.status === "rejected"
-                          ? "bg-neutral-100 text-neutral-500"
-                          : "bg-red-50 text-red-500"
-                      }`}
-                    >
-                      {app.status === "pending"
-                        ? "等待中"
-                        : app.status === "accepted"
-                        ? "已选中"
-                        : app.status === "rejected"
-                        ? "未选中"
-                        : app.status === "withdrawn"
-                        ? "已撤回"
-                        : "已取消"}
-                    </span>
+                  <div className="flex items-start gap-3">
+                    {/* 物品小图 */}
+                    <div className="w-14 h-14 rounded-lg bg-neutral-100 overflow-hidden flex-shrink-0">
+                      {app.item?.images?.[0]?.url ? (
+                        <img src={(app.item as any).images[0].url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <Link
+                          href={`/items/${app.item_id}`}
+                          className="text-sm font-medium text-neutral-900 hover:text-primary transition-colors truncate"
+                        >
+                          {app.item?.title || '查看物品 →'}
+                        </Link>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
+                            app.status === "pending"
+                              ? "bg-amber-50 text-amber-600"
+                              : app.status === "accepted"
+                              ? "bg-green-50 text-green-600"
+                              : app.status === "rejected"
+                              ? "bg-neutral-100 text-neutral-500"
+                              : "bg-red-50 text-red-500"
+                          }`}
+                        >
+                          {app.status === "pending"
+                            ? "等待中"
+                            : app.status === "accepted"
+                            ? "🎉 已选中"
+                            : app.status === "rejected"
+                            ? "未选中"
+                            : app.status === "withdrawn"
+                            ? "已撤回"
+                            : "已取消"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-neutral-500 line-clamp-2 mb-1">
+                        {app.reason}
+                      </p>
+                      <p className="text-xs text-neutral-400">
+                        提交于 {new Date(app.created_at).toLocaleDateString("zh-CN")}
+                      </p>
+                      {/* 提交反馈按钮（被选中且物品未完成时显示） */}
+                      {app.status === "accepted" && app.item?.status !== 'completed' && (
+                        <Link
+                          href={`/feedback/new?item=${app.item_id}`}
+                          className="mt-2 inline-flex items-center gap-1 text-sm text-orange-500 hover:text-orange-600 font-medium"
+                        >
+                          ✍️ 提交感谢信 →
+                        </Link>
+                      )}
+                      {/* 已提交反馈的提示 */}
+                      {app.item?.status === 'completed' && (
+                        <p className="mt-2 text-xs text-green-600 font-medium">
+                          ✅ 已完成反馈
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-sm text-neutral-500 line-clamp-2">
-                    {app.reason}
-                  </p>
-                  <p className="text-xs text-neutral-400 mt-2">
-                    提交于{" "}
-                    {new Date(app.created_at).toLocaleDateString("zh-CN")}
-                  </p>
-                  {/* 提交反馈按钮（被选中且物品未完成时显示） */}
-                  {app.status === "accepted" && app.item?.status !== 'completed' && (
-                    <Link
-                      href={`/feedback/new?item=${app.item_id}`}
-                      className="mt-3 inline-block text-sm text-orange-500 hover:text-orange-600 font-medium"
-                    >
-                      ✍️ 提交感谢信 →
-                    </Link>
-                  )}
-                  {/* 已提交反馈的提示 */}
-                  {app.item?.status === 'completed' && (
-                    <p className="mt-3 text-sm text-green-600 font-medium">
-                      ✅ 已提交反馈
-                    </p>
-                  )}
                 </div>
               ))}
             </div>

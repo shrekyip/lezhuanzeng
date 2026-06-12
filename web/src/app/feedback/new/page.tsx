@@ -3,11 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
-import { createFeedback, uploadFeedbackImage, getItemById } from '@/lib/db';
+import { createFeedback, uploadFeedbackImage, getItemById, getCurrentUser } from '@/lib/db';
 import Navbar from '@/components/navbar';
-
-const supabase = createClient();
 
 const MAX_IMAGES = 5;
 const MAX_IMAGE_SIZE = 1024 * 1024; // 1MB
@@ -18,6 +15,7 @@ export default function NewFeedbackPage() {
 
   const [itemId, setItemId] = useState<string>('');
   const [item, setItem] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -37,21 +35,22 @@ export default function NewFeedbackPage() {
     const id = params.get('item');
     if (id) {
       setItemId(id);
-      loadItem(id);
+      loadData(id);
     } else {
       setError('缺少物品参数');
       setLoading(false);
     }
   }, []);
 
-  async function loadItem(id: string) {
+  async function loadData(id: string) {
     try {
-      const data = await getItemById(id);
+      const [data, user] = await Promise.all([getItemById(id), getCurrentUser()]);
       if (data) {
         setItem(data);
       } else {
         setError('物品不存在');
       }
+      setCurrentUser(user);
     } catch (err: any) {
       setError(err.message || '加载失败');
     } finally {
@@ -172,9 +171,9 @@ export default function NewFeedbackPage() {
 
     setSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setError('请先登录');
+      // 用 demo 用户（无真实登录）
+      if (!currentUser) {
+        setError('用户信息加载中，请稍后重试');
         setSubmitting(false);
         return;
       }
@@ -182,7 +181,7 @@ export default function NewFeedbackPage() {
       // 创建反馈
       const feedback = await createFeedback({
         itemId,
-        applicantId: user.id,
+        applicantId: currentUser.id,
         giverId: item.giver_id,
         thankLetter,
       });
@@ -245,9 +244,9 @@ export default function NewFeedbackPage() {
         {item && (
           <div className="bg-white rounded-2xl p-4 mb-8 border border-neutral-100 flex items-center gap-4">
             <div className="w-16 h-16 bg-neutral-100 rounded-xl overflow-hidden flex-shrink-0">
-              {item.item_images?.[0]?.url && (
+              {item.images?.[0]?.url && (
                 <img
-                  src={item.item_images[0].url}
+                  src={item.images[0].url}
                   alt={item.title}
                   className="w-full h-full object-cover"
                 />
@@ -256,7 +255,7 @@ export default function NewFeedbackPage() {
             <div className="flex-1 min-w-0">
               <div className="font-medium text-neutral-900 truncate">{item.title}</div>
               <div className="text-sm text-neutral-500 mt-1">
-                赠与者：{item.profiles?.nickname || '匿名用户'}
+                赠与者：{item.giver?.nickname || '匿名用户'}
               </div>
             </div>
           </div>

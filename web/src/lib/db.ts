@@ -276,7 +276,7 @@ export async function getApplicationsByUser(userId: string): Promise<Application
     .select(`
       *,
       applicant:profiles(*),
-      item:items(*)
+      item:items(*, images:item_images(*))
     `)
     .eq('applicant_id', userId)
     .order('created_at', { ascending: false });
@@ -352,6 +352,7 @@ export async function getFeedbackForItem(itemId: string): Promise<Feedback[]> {
     .from('feedback')
     .select(`
       *,
+      applicant:profiles(*),
       images:feedback_images(*)
     `)
     .eq('item_id', itemId);
@@ -505,4 +506,72 @@ export async function rateFeedback(
         .eq('id', giverId);
     }
   }
+}
+
+// ===== 赠主选择申领者 =====
+
+export async function selectApplicant(
+  applicationId: string,
+  itemId: string
+): Promise<Application> {
+  const supabase = createClient();
+
+  // 1. 接受该申领
+  const { data: accepted, error: acceptErr } = await supabase
+    .from('applications')
+    .update({ status: 'accepted', updated_at: new Date().toISOString() })
+    .eq('id', applicationId)
+    .select(`*, applicant:profiles(*)`)
+    .single();
+
+  if (acceptErr || !accepted) throw acceptErr || new Error('更新申领状态失败');
+
+  // 2. 拒绝该物品的其他待定申领
+  await supabase
+    .from('applications')
+    .update({
+      status: 'rejected',
+      updated_at: new Date().toISOString(),
+      rejected_at: new Date().toISOString(),
+    })
+    .eq('item_id', itemId)
+    .eq('status', 'pending')
+    .neq('id', applicationId);
+
+  // 3. 更新物品状态为 selected（等待寄出）
+  await supabase
+    .from('items')
+    .update({ status: 'selected', updated_at: new Date().toISOString() })
+    .eq('id', itemId);
+
+  // 4. 创建通知：告知申领者被选中
+  const applicantId = (accepted as Application).applicant_id;
+  const giverId = (accepted as Application).item?.giver_id
+    || (await supabase.from('items').select('giver_id').eq('id', itemId).single()).data?.giver_id;
+
+  if (applicantId) {
+    await supabase.from('notifications').insert({
+      user_id: applicantId,
+      type: 'selected',
+      content: '恭喜！你的申领被赠主选中了，请留意快递到付包裹。',
+      item_id: itemId,
+    }).select();
+  }
+
+  return accepted as Application;
+}
+
+// ===== getDashboardStats =====
+
+export async function getDashboardStats(userId: string) {
+  const supabase = createClient();
+  const [itemsRes, appsRes] = await Promise.all([
+    supabase.from('items').select('id, status', { count: 'exact' }).eq('giver_id', userId),
+    supabase.from('applications').select('id, status', { count: 'exact' }).eq('applicant_id', userId),
+  ]);
+  return {
+    totalGiven: (itemsRes.data || []).filter((i) => i.status === 'completed').length,
+    totalApplied: appsRes.count || 0,
+    activeItems: (itemsRes.data || []).filter((i) => i.status === 'active').length,
+  };
 }

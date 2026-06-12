@@ -3,12 +3,18 @@ export interface Profile {
   id: string;
   nickname: string;
   avatar_url: string;
+  phone: string;
   city: string;
+  bio: string;
   trust_score: number;
   completed_cycles: number;
   red_flowers: number;
   total_given: number;
   is_blocked: boolean;
+  blocked_until?: string | null;
+  block_reason?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // 物品

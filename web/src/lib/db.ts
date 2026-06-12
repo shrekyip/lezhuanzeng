@@ -34,8 +34,36 @@ export function setCurrentUserId(userId: string) {
   localStorage.setItem(CURRENT_USER_KEY, userId);
 }
 
+// 判断当前是否为真实登录用户（通过 Supabase Auth）
+export async function getAuthUser() {
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    return user; // null if not authenticated
+  } catch {
+    return null;
+  }
+}
+
 export async function getCurrentUser(): Promise<Profile> {
   const supabase = createClient();
+
+  // 优先使用 Supabase Auth 用户
+  try {
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+      if (data) return data as Profile;
+    }
+  } catch {
+    // Auth 不可用，回退到 demo 用户
+  }
+
+  // 回退到 demo 用户
   const id = getCurrentUserId();
   const { data, error } = await supabase
     .from('profiles')
@@ -43,7 +71,6 @@ export async function getCurrentUser(): Promise<Profile> {
     .eq('id', id)
     .single();
   if (error || !data) {
-    // fallback: return first demo user
     const { data: fallback } = await supabase
       .from('profiles')
       .select('*')
@@ -52,6 +79,19 @@ export async function getCurrentUser(): Promise<Profile> {
     return fallback as Profile;
   }
   return data as Profile;
+}
+
+export async function signOut() {
+  try {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+  } catch {
+    // ignore
+  }
+  // 清除 demo 用户缓存
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(CURRENT_USER_KEY);
+  }
 }
 
 export async function getProfiles(): Promise<Profile[]> {

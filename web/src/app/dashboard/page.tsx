@@ -7,8 +7,8 @@ import {
   getCurrentUser,
   getItemsByGiver,
   getApplicationsByUser,
-  DEMO_USERS,
-  setCurrentUserId,
+  getAuthUser,
+  signOut,
 } from "@/lib/db";
 import type { Item, Application, Profile } from "@/types";
 
@@ -16,11 +16,15 @@ export default function DashboardPage() {
   const [user, setUser] = useState<Profile | null>(null);
   const [myItems, setMyItems] = useState<Item[]>([]);
   const [myApplications, setMyApplications] = useState<Application[]>([]);
+  const [isAuth, setIsAuth] = useState(false);
   const [tab, setTab] = useState<"items" | "applications">("items");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
+      const authUser = await getAuthUser();
+      setIsAuth(!!authUser);
+
       const currentUser = await getCurrentUser();
       setUser(currentUser);
 
@@ -61,25 +65,13 @@ export default function DashboardPage() {
             <span>已转赠 {user.total_given} 件</span>
             <span>·</span>
             <span>小红花 🌸{user.red_flowers}</span>
+            {isAuth && (
+              <>
+                <span>·</span>
+                <span className="text-green-600">✓ 已认证</span>
+              </>
+            )}
           </div>
-        </div>
-        {/* 开发阶段：用户切换器 */}
-        <div className="flex-shrink-0">
-          <select
-            value={user.id}
-            onChange={(e) => {
-              setCurrentUserId(e.target.value);
-              window.location.reload();
-            }}
-            className="text-xs border border-neutral-200 rounded-lg px-2 py-1 text-neutral-500 bg-neutral-50"
-            title="切换演示用户（开发用）"
-          >
-            {DEMO_USERS.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.nickname}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 

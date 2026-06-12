@@ -2,25 +2,34 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   getCurrentUserId,
   setCurrentUserId,
   getCurrentUser,
   getProfiles,
   getUnreadCount,
+  getAuthUser,
+  signOut,
   DEMO_USERS,
 } from "@/lib/db";
 import type { Profile } from "@/types";
 
 export default function Navbar() {
+  const router = useRouter();
   const [user, setUser] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [isAuth, setIsAuth] = useState(false);
   const [showSwitcher, setShowSwitcher] = useState(false);
   const [unread, setUnread] = useState(0);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const load = async () => {
+      // 检查是否有真实登录用户
+      const authUser = await getAuthUser();
+      setIsAuth(!!authUser);
+
       const [currentUser, allProfiles] = await Promise.all([
         getCurrentUser(),
         getProfiles(),
@@ -40,6 +49,12 @@ export default function Navbar() {
           <Link href="/" className="text-2xl font-bold text-primary">
             乐转赠
           </Link>
+          <Link
+            href="/auth/login"
+            className="text-sm text-primary hover:text-primary-dark font-medium"
+          >
+            登录
+          </Link>
         </div>
       </header>
     );
@@ -51,6 +66,12 @@ export default function Navbar() {
     setUser(newUser);
     setUnread(await getUnreadCount(newUser.id));
     setShowSwitcher(false);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    setIsAuth(false);
+    router.push("/auth/login");
   };
 
   return (
@@ -92,7 +113,7 @@ export default function Navbar() {
           </Link>
         </nav>
 
-        {/* User Switcher (MVP) */}
+        {/* User Area */}
         <div className="relative">
           <button
             onClick={() => setShowSwitcher(!showSwitcher)}
@@ -102,6 +123,11 @@ export default function Navbar() {
               {user.nickname[0]}
             </div>
             <span className="text-neutral-700">{user.nickname}</span>
+            {isAuth && (
+              <span className="text-[10px] bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">
+                已认证
+              </span>
+            )}
             <svg
               className="w-3 h-3 text-neutral-400"
               fill="none"
@@ -118,25 +144,61 @@ export default function Navbar() {
           </button>
 
           {showSwitcher && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-neutral-100 py-2">
-              <div className="px-3 py-1.5 text-xs text-neutral-400">
-                MVP 测试用户切换
-              </div>
-              {profiles.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => switchUser(p.id)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-neutral-50 transition-colors ${
-                    user.id === p.id ? "text-primary font-medium" : "text-neutral-700"
-                  }`}
-                >
-                  <div className="w-6 h-6 rounded-full bg-neutral-100 text-neutral-500 text-xs flex items-center justify-center shrink-0">
-                    {p.nickname[0]}
+            <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-neutral-100 py-2">
+              {isAuth ? (
+                /* 真实登录用户菜单 */
+                <>
+                  <div className="px-3 py-1.5 text-xs text-neutral-400 border-b border-neutral-100">
+                    {user.phone ? `📱 ${user.phone}` : "手机号登录"}
                   </div>
-                  {p.nickname}
-                  {user.id === p.id && " ✓"}
-                </button>
-              ))}
+                  <Link
+                    href="/dashboard"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
+                    onClick={() => setShowSwitcher(false)}
+                  >
+                    📋 我的物品
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    🚪 退出登录
+                  </button>
+                </>
+              ) : (
+                /* Demo 用户切换 + 登录入口 */
+                <>
+                  <div className="px-3 py-1.5 text-xs text-neutral-400">
+                    测试用户切换
+                  </div>
+                  {profiles.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => switchUser(p.id)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-neutral-50 transition-colors ${
+                        user.id === p.id
+                          ? "text-primary font-medium"
+                          : "text-neutral-700"
+                      }`}
+                    >
+                      <div className="w-6 h-6 rounded-full bg-neutral-100 text-neutral-500 text-xs flex items-center justify-center shrink-0">
+                        {p.nickname[0]}
+                      </div>
+                      {p.nickname}
+                      {user.id === p.id && " ✓"}
+                    </button>
+                  ))}
+                  <div className="border-t border-neutral-100 mt-1 pt-1">
+                    <Link
+                      href="/auth/login"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary hover:bg-primary-50 transition-colors"
+                      onClick={() => setShowSwitcher(false)}
+                    >
+                      📱 手机号登录
+                    </Link>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

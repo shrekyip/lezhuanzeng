@@ -25,16 +25,12 @@ export async function GET(request: NextRequest) {
           .single();
 
         if (!existingProfile) {
-          // 从用户元数据或手机号提取信息
+          // 新用户：创建临时 profile，引导到 profile-setup 完善信息
           const phone = user.phone || "";
-          const nickname =
-            user.user_metadata?.nickname ||
-            user.user_metadata?.full_name ||
-            (phone ? `用户${phone.slice(-4)}` : "新用户");
 
           await supabase.from("profiles").insert({
             id: user.id,
-            nickname,
+            nickname: "", // 空昵称，标记为需要完善
             phone,
             city: "",
             bio: "",
@@ -44,6 +40,25 @@ export async function GET(request: NextRequest) {
             total_given: 0,
             is_blocked: false,
           });
+
+          // 新用户跳转到完善信息页
+          return NextResponse.redirect(
+            `${origin}/auth/profile-setup`
+          );
+        } else {
+          // 老用户：检查是否已设置昵称
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("nickname")
+            .eq("id", user.id)
+            .single();
+
+          if (profile && !profile.nickname) {
+            // 昵称为空，需要完善信息
+            return NextResponse.redirect(
+              `${origin}/auth/profile-setup`
+            );
+          }
         }
       }
 

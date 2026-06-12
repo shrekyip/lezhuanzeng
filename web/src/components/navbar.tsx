@@ -53,7 +53,7 @@ export default function Navbar() {
             href="/auth/login"
             className="text-sm text-primary hover:text-primary-dark font-medium"
           >
-            登录
+            登录 / 注册
           </Link>
         </div>
       </header>

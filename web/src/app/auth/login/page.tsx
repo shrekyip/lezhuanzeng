@@ -92,8 +92,27 @@ export default function LoginPage() {
         return;
       }
 
-      // 登录成功，跳转到首页
-      router.push("/");
+      // 验证成功，检查是否需要完善个人信息
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+
+      if (authUser) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("nickname")
+          .eq("id", authUser.id)
+          .single();
+
+        if (!profile || !profile.nickname) {
+          // 新用户或未设置昵称，跳转到完善信息页
+          router.push("/auth/profile-setup");
+        } else {
+          router.push("/");
+        }
+      } else {
+        router.push("/");
+      }
       router.refresh();
     } catch {
       setError("验证失败，请稍后重试");
@@ -127,10 +146,10 @@ export default function LoginPage() {
           {step === "phone" ? (
             <>
               <h2 className="text-lg font-bold text-neutral-900 mb-1">
-                手机号登录
+                登录 / 注册
               </h2>
               <p className="text-sm text-neutral-500 mb-6">
-                输入手机号，我们将发送验证码
+                输入手机号，新用户将自动创建账号
               </p>
 
               <div className="space-y-4">

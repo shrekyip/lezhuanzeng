@@ -10,6 +10,7 @@ import type {
   Application,
   Feedback,
   Notification,
+  NotificationType,
 } from '@/types';
 
 // MVP: 固定的测试用户 ID（接入微信登录后替换为 auth.uid()）
@@ -380,6 +381,15 @@ export async function markNotificationRead(id: string): Promise<void> {
   await supabase.from('notifications').update({ is_read: true }).eq('id', id);
 }
 
+export async function markAllNotificationsRead(userId: string): Promise<void> {
+  const supabase = createClient();
+  await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+}
+
 export async function getUnreadCount(userId: string): Promise<number> {
   const supabase = createClient();
   const { count, error } = await supabase
@@ -390,6 +400,24 @@ export async function getUnreadCount(userId: string): Promise<number> {
 
   if (error) return 0;
   return count || 0;
+}
+
+// 创建通知的统一方法
+export async function createNotification(params: {
+  userId: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  relatedItemId?: string;
+}): Promise<void> {
+  const supabase = createClient();
+  await supabase.from('notifications').insert({
+    user_id: params.userId,
+    type: params.type,
+    title: params.title,
+    body: params.body,
+    related_item_id: params.relatedItemId || null,
+  });
 }
 
 // ===== 反馈模块（新增/修改）=====
@@ -544,21 +572,127 @@ export async function selectApplicant(
     .update({ status: 'selected', updated_at: new Date().toISOString() })
     .eq('id', itemId);
 
-  // 4. 创建通知：告知申领者被选中
+  // 4. 通知申领者被选中
   const applicantId = (accepted as Application).applicant_id;
-  const giverId = (accepted as Application).item?.giver_id
-    || (await supabase.from('items').select('giver_id').eq('id', itemId).single()).data?.giver_id;
-
   if (applicantId) {
-    await supabase.from('notifications').insert({
-      user_id: applicantId,
-      type: 'selected',
-      content: '恭喜！你的申领被赠主选中了，请留意快递到付包裹。',
-      item_id: itemId,
-    }).select();
+    await createNotification({
+      userId: applicantId,
+      type: 'application_accepted',
+      title: '你的申领被选中了',
+      body: '恭喜！你的申领被赠主选中了，请留意快递到付包裹。',
+      relatedItemId: itemId,
+    });
   }
 
   return accepted as Application;
+}
+
+// ===== 赠主确认寄出 =====
+
+export async function confirmShipment(itemId: string, trackingNumber?: string): Promise<void> {
+  const supabase = createClient();
+
+  // 更新物品状态为 shipped
+  await supabase
+    .from('items')
+    .update({
+      status: 'shipped',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', itemId);
+
+  // 获取被接受的申领者，通知对方
+  const { data: acceptedApp } = await supabase
+    .from('applications')
+    .select('applicant_id')
+    .eq('item_id', itemId)
+    .eq('status', 'accepted')
+    .single();
+
+  if (acceptedApp?.applicant_id) {
+    await createNotification({
+      userId: acceptedApp.applicant_id,
+      type: 'item_shipped',
+      title: '物品已寄出',
+      body: trackingNumber
+        ? `赠主已寄出物品，快递单号：${trackingNumber}，请注意查收到付包裹。`
+        : '赠主已寄出物品，请注意查收到付包裹。',
+      relatedItemId: itemId,
+    });
+  }
+}
+
+// ===== 申领者确认收货 =====
+
+export async function confirmReceipt(itemId: string): Promise<void> {
+  const supabase = createClient();
+
+  // 更新物品状态为 completed（反馈提交时也设 completed，这里先标记已收货等待反馈）
+  await supabase
+    .from('items')
+    .update({
+      status: 'completed',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', itemId);
+
+  // 通知赠主
+  const { data: item } = await supabase
+    .from('items')
+    .select('giver_id, title')
+    .eq('id', itemId)
+    .single();
+
+  if (item?.giver_id) {
+    await createNotification({
+      userId: item.giver_id,
+      type: 'feedback_received',
+      title: '物品已签收',
+      body: `「${item.title}」已被签收，等待对方提交感谢反馈。`,
+      relatedItemId: itemId,
+    });
+  }
+}
+
+// ===== 申领者拒绝接受 =====
+
+export async function declineAcceptance(itemId: string, applicationId: string): Promise<void> {
+  const supabase = createClient();
+
+  // 1. 更新该申领为 cancelled
+  await supabase
+    .from('applications')
+    .update({
+      status: 'cancelled',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', applicationId);
+
+  // 2. 物品回到 active 状态（让赠主可以重新选择）
+  await supabase
+    .from('items')
+    .update({
+      status: 'active',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', itemId);
+
+  // 3. 通知赠主
+  const { data: item } = await supabase
+    .from('items')
+    .select('giver_id, title')
+    .eq('id', itemId)
+    .single();
+
+  if (item?.giver_id) {
+    await createNotification({
+      userId: item.giver_id,
+      type: 'application_rejected',
+      title: '受赠者拒绝了物品',
+      body: `「${item.title}」的受赠者拒绝了接受，物品已回到可申领状态，你可以重新选择。`,
+      relatedItemId: itemId,
+    });
+  }
 }
 
 // ===== getDashboardStats =====

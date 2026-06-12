@@ -11,6 +11,9 @@ import {
   getFeedbackForItem,
   rateFeedback,
   selectApplicant,
+  confirmShipment,
+  confirmReceipt,
+  declineAcceptance,
 } from "@/lib/db";
 import type { Item, Application, Profile } from "@/types";
 
@@ -29,6 +32,13 @@ export default function ItemDetailPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selecting, setSelecting] = useState<string | null>(null); // applicationId being selected
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // 获取当前用户作为申领者的被接受申领
+  const myAcceptedApp = applications.find(
+    (a) => a.applicant_id === currentUser?.id && a.status === 'accepted'
+  );
 
   useEffect(() => {
     const load = async () => {
@@ -115,6 +125,55 @@ export default function ItemDetailPage() {
     setSubmitting(false);
   };
 
+  const handleConfirmShipment = async () => {
+    if (!item || actionLoading) return;
+    if (!confirm('确认已寄出物品？')) return;
+    setActionLoading(true);
+    try {
+      await confirmShipment(item.id, trackingNumber || undefined);
+      setItem((prev) => prev ? { ...prev, status: 'shipped' } : prev);
+    } catch (err) {
+      console.error('Shipment error:', err);
+      alert('操作失败，请重试');
+    }
+    setActionLoading(false);
+  };
+
+  const handleConfirmReceipt = async () => {
+    if (!item || actionLoading) return;
+    if (!confirm('确认已收到物品？')) return;
+    setActionLoading(true);
+    try {
+      await confirmReceipt(item.id);
+      setItem((prev) => prev ? { ...prev, status: 'completed' } : prev);
+      // 加载反馈
+      setFeedback(await getFeedbackForItem(item.id));
+    } catch (err) {
+      console.error('Receipt error:', err);
+      alert('操作失败，请重试');
+    }
+    setActionLoading(false);
+  };
+
+  const handleDeclineAcceptance = async () => {
+    if (!item || !myAcceptedApp || actionLoading) return;
+    if (!confirm('确认拒绝接受此物品？物品将回到可申领状态。')) return;
+    setActionLoading(true);
+    try {
+      await declineAcceptance(item.id, myAcceptedApp.id);
+      setItem((prev) => prev ? { ...prev, status: 'active' } : prev);
+      setApplications((prev) =>
+        prev.map((a) =>
+          a.id === myAcceptedApp.id ? { ...a, status: 'cancelled' } : a
+        )
+      );
+    } catch (err) {
+      console.error('Decline error:', err);
+      alert('操作失败，请重试');
+    }
+    setActionLoading(false);
+  };
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       {/* Back Link */}
@@ -189,12 +248,93 @@ export default function ItemDetailPage() {
           )}
 
           {/* Status / Action */}
-          {item.status !== "active" ? (
-            <div className="bg-neutral-50 rounded-xl p-4 text-center">
-              <span className="text-sm text-neutral-500">
-                此物品{item.status === "selected" ? "已被选受赠者" : "已完成转赠"}
+          {item.status === 'completed' ? (
+            <div className="bg-green-50 rounded-xl p-4 text-center">
+              <span className="text-sm text-green-700 font-medium">
+                ✅ 此物品已完成转赠
               </span>
             </div>
+          ) : item.status === 'shipped' ? (
+            isGiver ? (
+              <div className="bg-blue-50 rounded-xl p-4 text-center">
+                <span className="text-sm text-blue-700 font-medium">
+                  📦 物品已寄出，等待对方确认收货
+                </span>
+              </div>
+            ) : myAcceptedApp ? (
+              <div className="bg-blue-50 rounded-xl p-4 space-y-3">
+                <p className="text-sm text-blue-700 font-medium text-center">
+                  📦 物品已寄出，确认收货后请点击下方按钮
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleConfirmReceipt}
+                    disabled={actionLoading}
+                    className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors disabled:opacity-60"
+                  >
+                    {actionLoading ? '处理中...' : '确认收货'}
+                  </button>
+                  <button
+                    onClick={handleDeclineAcceptance}
+                    disabled={actionLoading}
+                    className="px-4 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-600 hover:bg-neutral-50 transition-colors disabled:opacity-60"
+                  >
+                    拒绝接受
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-neutral-50 rounded-xl p-4 text-center">
+                <span className="text-sm text-neutral-500">此物品已寄出</span>
+              </div>
+            )
+          ) : item.status === 'selected' ? (
+            isGiver ? (
+              <div className="bg-amber-50 rounded-xl p-4 space-y-3">
+                <p className="text-sm text-amber-700 font-medium text-center">
+                  ✅ 已选定受赠者，请尽快寄出物品
+                </p>
+                <div>
+                  <label className="text-xs text-neutral-500 mb-1 block">
+                    快递单号（选填）
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="填写快递单号方便追踪"
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-sm focus:outline-none focus:border-primary transition-colors"
+                  />
+                </div>
+                <button
+                  onClick={handleConfirmShipment}
+                  disabled={actionLoading}
+                  className="w-full py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors disabled:opacity-60"
+                >
+                  {actionLoading ? '处理中...' : '确认已寄出'}
+                </button>
+              </div>
+            ) : myAcceptedApp ? (
+              <div className="bg-green-50 rounded-xl p-4 space-y-3">
+                <p className="text-sm text-green-700 font-medium text-center">
+                  🎉 你的申领被选中了！
+                </p>
+                <p className="text-xs text-green-600 text-center">
+                  等待赠主寄出物品，注意查收到付包裹
+                </p>
+                <button
+                  onClick={handleDeclineAcceptance}
+                  disabled={actionLoading}
+                  className="w-full py-2 rounded-xl border border-neutral-200 text-sm text-neutral-600 hover:bg-neutral-50 transition-colors disabled:opacity-60"
+                >
+                  拒绝接受（不再需要此物品）
+                </button>
+              </div>
+            ) : (
+              <div className="bg-neutral-50 rounded-xl p-4 text-center">
+                <span className="text-sm text-neutral-500">此物品已被选受赠者</span>
+              </div>
+            )
           ) : isGiver ? (
             <div className="bg-amber-50 rounded-xl p-4">
               <p className="text-sm text-amber-700 font-medium mb-2">
@@ -289,8 +429,13 @@ export default function ItemDetailPage() {
             申领者列表 ({applications.filter(a => a.status === 'pending').length} 人等待中)
           </h2>
           {item.status === 'selected' && (
-            <div className="mb-4 bg-green-50 border border-green-100 rounded-xl px-4 py-3 text-sm text-green-700">
-              ✅ 已选定申领者，等待对方收货并提交反馈
+            <div className="mb-4 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-sm text-amber-700">
+              ✅ 已选定申领者，请在上方确认寄出
+            </div>
+          )}
+          {item.status === 'shipped' && (
+            <div className="mb-4 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm text-blue-700">
+              📦 物品已寄出，等待对方确认收货
             </div>
           )}
           <div className="space-y-3">
@@ -349,8 +494,29 @@ export default function ItemDetailPage() {
         </section>
       )}
 
-      {/* Feedback display (giver only, after completed) */}
-      {isGiver && feedback.length > 0 && (
+      {/* Feedback prompt for applicant (after completed) */}
+      {item.status === 'completed' && !isGiver && myAcceptedApp && feedback.length === 0 && (
+        <section className="mt-12">
+          <div className="bg-orange-50/50 rounded-2xl p-6 border border-orange-100 text-center">
+            <div className="text-3xl mb-3">💌</div>
+            <h3 className="text-lg font-bold text-neutral-900 mb-2">
+              请提交你的感谢反馈
+            </h3>
+            <p className="text-sm text-neutral-600 mb-4">
+              分享你收到物品后的使用情况和感谢，让赠主感受到你的真诚
+            </p>
+            <Link
+              href={`/feedback/new?itemId=${item.id}`}
+              className="inline-block rounded-full bg-primary text-white px-8 py-3 text-sm font-medium hover:bg-primary-dark transition-colors shadow-sm"
+            >
+              写感谢信
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {/* Feedback display (after completed) */}
+      {item.status === 'completed' && feedback.length > 0 && (
         <section className="mt-12">
           <h2 className="text-lg font-bold text-neutral-900 mb-6">
             💝 收到的感谢信

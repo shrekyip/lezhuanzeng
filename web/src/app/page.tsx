@@ -4,19 +4,48 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import ItemCard from "@/components/item-card";
-import { getItems, getCategories, initMockData } from "@/lib/mock-data";
+import { getItems, getCategories } from "@/lib/db";
 import type { Item, Category } from "@/types";
 
 export default function Home() {
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [stats, setStats] = useState({ totalItems: 0, totalUsers: 0, totalCompleted: 0 });
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    initMockData();
-    setItems(getItems());
-    setCategories(getCategories());
-    setMounted(true);
+    const loadData = async () => {
+      const [allItems, cats] = await Promise.all([
+        getItems(),
+        getCategories(),
+      ]);
+      setItems(allItems);
+      setCategories(cats);
+
+      // 获取统计数据
+      try {
+        const supabase = (await import("@/lib/supabase/client")).createClient();
+        const [
+          { count: itemCount },
+          { count: userCount },
+          { count: completedCount },
+        ] = await Promise.all([
+          supabase.from('items').select('*', { count: 'exact', head: true }),
+          supabase.from('profiles').select('*', { count: 'exact', head: true }),
+          supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+        ]);
+        setStats({
+          totalItems: itemCount || 0,
+          totalUsers: userCount || 0,
+          totalCompleted: completedCount || 0,
+        });
+      } catch (e) {
+        // 统计数据获取失败不影响首页渲染
+      }
+
+      setMounted(true);
+    };
+    loadData();
   }, []);
 
   return (
@@ -56,7 +85,7 @@ export default function Home() {
             </div>
 
             <p className="mt-6 text-sm text-warm-500">
-              ✨ 已有 <span className="font-semibold text-primary">127</span> 件物品找到新主人
+              ✨ 已有 <span className="font-semibold text-primary">{stats.totalCompleted || '—'}</span> 件物品找到新主人
             </p>
           </div>
 
@@ -147,6 +176,30 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Section 2.5: 最新物品 - 真实数据 */}
+      {items.length > 0 && (
+        <section className="py-12 px-4 bg-warm-50">
+          <div className="max-w-5xl mx-auto">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold text-warm-900">
+                最新发布的物品
+              </h2>
+              <Link
+                href="/browse"
+                className="text-sm text-primary hover:text-primary-dark font-medium"
+              >
+                查看全部 →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {items.slice(0, 6).map((item) => (
+                <ItemCard key={item.id} item={item} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Section 3: 真实案例 - 核心说服区 */}
       <section className="py-16 px-4 bg-warm-50">
@@ -321,7 +374,7 @@ export default function Home() {
             准备好体验「给予的快乐」了吗？
           </h2>
           <p className="text-primary-light mb-8 text-lg">
-            加入已有 300+ 用户的温暖社区
+            加入已有 {stats.totalUsers || '—'} 位用户的温暖社区
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link

@@ -74,15 +74,21 @@ export default function Navbar() {
             发布物品
           </Link>
           <Link
-            href="/dashboard"
+            href="/notifications"
             className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors relative"
           >
-            我的物品
+            通知
             {unread > 0 && (
               <span className="absolute -top-1 -right-3 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
                 {unread}
               </span>
             )}
+          </Link>
+          <Link
+            href="/dashboard"
+            className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
+          >
+            我的物品
           </Link>
         </nav>
 
@@ -149,6 +155,15 @@ export default function Navbar() {
           className="flex-1 text-center py-2.5 text-xs text-neutral-500"
         >
           发布
+        </Link>
+        <Link
+          href="/notifications"
+          className="flex-1 text-center py-2.5 text-xs text-neutral-500 relative"
+        >
+          通知
+          {unread > 0 && (
+            <span className="absolute top-1 right-1/4 w-2 h-2 rounded-full bg-red-500" />
+          )}
         </Link>
         <Link
           href="/dashboard"

@@ -172,6 +172,10 @@ export default function NewItemPage() {
       setError("请输入所在城市");
       return;
     }
+    if (images.length === 0) {
+      setError("请至少上传一张物品照片");
+      return;
+    }
 
     setSubmitting(true);
     try {

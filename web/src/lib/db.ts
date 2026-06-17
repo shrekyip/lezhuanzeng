@@ -349,6 +349,26 @@ export async function createApplication(
 
   if (error) throw error;
 
+  // 通知捐赠者有人申领
+  try {
+    const [{ data: item }, { data: applicant }] = await Promise.all([
+      supabase.from('items').select('giver_id, title').eq('id', data.item_id).single(),
+      supabase.from('profiles').select('nickname').eq('id', data.applicant_id).single(),
+    ]);
+
+    if (item?.giver_id) {
+      await createNotification({
+        userId: item.giver_id,
+        type: 'new_application',
+        title: '有人申领你的物品',
+        body: `${applicant?.nickname || '有人'} 申领了你的物品「${item.title}」，快去看看吧！`,
+        relatedItemId: data.item_id,
+      });
+    }
+  } catch (_) {
+    // 通知发送失败不影响申领流程
+  }
+
   // Update applicant_count on item
   try {
     const { count } = await supabase

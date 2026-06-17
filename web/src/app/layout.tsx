@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Navbar from "@/components/navbar";
+import NotificationToast from "@/components/NotificationToast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export default function RootLayout({
     <html lang="zh-CN" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-warm-50 text-warm-900 font-sans">
         <Navbar />
+        <NotificationToast />
         <main className="flex-1">{children}</main>
       </body>
     </html>

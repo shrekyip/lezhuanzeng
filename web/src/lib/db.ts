@@ -331,6 +331,39 @@ export async function createApplication(
 ): Promise<Application> {
   const supabase = createClient();
 
+  // 拉黑用户不能申领
+  const blockState = await isUserBlocked(data.applicant_id);
+  if (blockState.blocked) {
+    const untilText = blockState.until
+      ? `（限制期至 ${new Date(blockState.until).toLocaleDateString('zh-CN')}）`
+      : '（永久限制）';
+    throw new Error(`账号当前被限制申领${untilText}。原因：${blockState.reason || '违反社区约定'}`);
+  }
+
+  // 申领频次限制：信用分 <100 每月 2 次，>=100 每月 5 次
+  const { data: myProfile } = await supabase
+    .from('profiles')
+    .select('trust_score')
+    .eq('id', data.applicant_id)
+    .single();
+  const monthlyLimit = (myProfile?.trust_score ?? 100) >= 100 ? 5 : 2;
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
+  const { count: monthlyCount } = await supabase
+    .from('applications')
+    .select('*', { count: 'exact', head: true })
+    .eq('applicant_id', data.applicant_id)
+    .gte('created_at', monthStart.toISOString());
+
+  if ((monthlyCount || 0) >= monthlyLimit) {
+    throw new Error(
+      `本月申领次数已达上限（${monthlyLimit} 次）。持续完成「赠物→反馈」闭环可以提升信用分、提高申领额度。`
+    );
+  }
+
   // Insert application
   const { data: app, error } = await supabase
     .from('applications')
@@ -403,6 +436,74 @@ export async function updateApplicationStatus(
       ...(status === 'rejected' ? { rejected_at: new Date().toISOString() } : {}),
     })
     .eq('id', id);
+}
+
+// ===== 申领编辑 / 撤回（防滥用规则）=====
+
+// 修改申领理由（限 3 次）
+export async function updateApplicationReason(
+  applicationId: string,
+  reason: string
+): Promise<void> {
+  const supabase = createClient();
+
+  const { data: app } = await supabase
+    .from('applications')
+    .select('edit_count, status, applicant_id, item_id')
+    .eq('id', applicationId)
+    .single();
+
+  if (!app) throw new Error('申领不存在');
+  if (app.status !== 'pending') throw new Error('只有等待中的申领可以修改');
+  if ((app.edit_count || 0) >= 3) throw new Error('修改次数已用完（最多 3 次）');
+  if (!reason || reason.trim().length < 30) throw new Error('申领理由至少 30 字');
+
+  await supabase
+    .from('applications')
+    .update({
+      reason: reason.trim(),
+      edit_count: (app.edit_count || 0) + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', applicationId);
+}
+
+// 撤回申领（赠主决定前可撤回，减少对方负担）
+export async function withdrawApplication(
+  applicationId: string,
+  itemId: string
+): Promise<void> {
+  const supabase = createClient();
+
+  const { data: app } = await supabase
+    .from('applications')
+    .select('status')
+    .eq('id', applicationId)
+    .single();
+
+  if (!app) throw new Error('申领不存在');
+  if (app.status !== 'pending') throw new Error('只有等待中的申领可以撤回');
+
+  await supabase
+    .from('applications')
+    .update({ status: 'withdrawn', updated_at: new Date().toISOString() })
+    .eq('id', applicationId);
+
+  // 更新物品申领人数
+  try {
+    const { count } = await supabase
+      .from('applications')
+      .select('*', { count: 'exact', head: true })
+      .eq('item_id', itemId)
+      .eq('status', 'pending');
+
+    if (count !== null) {
+      await supabase
+        .from('items')
+        .update({ applicant_count: count })
+        .eq('id', itemId);
+    }
+  } catch (_) {}
 }
 
 // ===== 反馈 =====
@@ -480,6 +581,162 @@ export async function createNotification(params: {
   });
 }
 
+// ===== 信用体系 =====
+
+type TrustEventType =
+  | 'feedback_on_time'
+  | 'feedback_good'
+  | 'feedback_late'
+  | 'feedback_poor'
+  | 'refuse_delivery'
+  | 'reselling';
+
+// 记录信用事件并更新用户信用分（可选拉黑）
+export async function recordTrustEvent(params: {
+  userId: string;
+  eventType: TrustEventType;
+  scoreChange: number;
+  blockDuration?: '3m' | '1y' | 'permanent';
+  description?: string;
+  relatedItemId?: string;
+}): Promise<void> {
+  const supabase = createClient();
+
+  // 1. 写入信用事件
+  await supabase.from('trust_events').insert({
+    user_id: params.userId,
+    event_type: params.eventType,
+    score_change: params.scoreChange,
+    block_duration: params.blockDuration || null,
+    description: params.description || '',
+  });
+
+  // 2. 计算拉黑截止时间
+  let blockedUntil: string | null = null;
+  let isBlocked = false;
+  if (params.blockDuration) {
+    isBlocked = true;
+    if (params.blockDuration !== 'permanent') {
+      const months = params.blockDuration === '3m' ? 3 : 12;
+      const d = new Date();
+      d.setMonth(d.getMonth() + months);
+      blockedUntil = d.toISOString();
+    }
+  }
+
+  // 3. 更新 profile：信用分 + 拉黑状态
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('trust_score')
+    .eq('id', params.userId)
+    .single();
+
+  await supabase
+    .from('profiles')
+    .update({
+      trust_score: Math.max(0, (profile?.trust_score ?? 100) + params.scoreChange),
+      ...(isBlocked ? { is_blocked: true, blocked_until: blockedUntil, block_reason: params.description || '' } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', params.userId);
+
+  // 4. 通知用户信用变更
+  const actionText =
+    params.scoreChange > 0
+      ? `信用分 +${params.scoreChange}`
+      : params.scoreChange < 0
+        ? `信用分 ${params.scoreChange}`
+        : '';
+  await createNotification({
+    userId: params.userId,
+    type: 'trust_updated',
+    title: isBlocked ? '账号已被限制申领' : '信用分变动',
+    body: isBlocked
+      ? `${params.description || '违反社区约定'}，${params.blockDuration === 'permanent' ? '账号被永久限制' : '限制期至 ' + (blockedUntil ? new Date(blockedUntil).toLocaleDateString('zh-CN') : '')}。期间可浏览物品，但不能申领。`
+      : `${actionText}。${params.description || ''}`,
+    relatedItemId: params.relatedItemId,
+  });
+}
+
+// 判断用户当前是否处于拉黑状态（懒解封：过期自动解除）
+export async function isUserBlocked(userId: string): Promise<{
+  blocked: boolean;
+  until: string | null;
+  reason: string;
+}> {
+  const supabase = createClient();
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_blocked, blocked_until, block_reason')
+    .eq('id', userId)
+    .single();
+
+  if (!profile?.is_blocked) return { blocked: false, until: null, reason: '' };
+
+  // 拉黑已到期 → 自动解封
+  if (profile.blocked_until && new Date(profile.blocked_until) < new Date()) {
+    await supabase
+      .from('profiles')
+      .update({ is_blocked: false, blocked_until: null, updated_at: new Date().toISOString() })
+      .eq('id', userId);
+    return { blocked: false, until: null, reason: '' };
+  }
+
+  return {
+    blocked: true,
+    until: profile.blocked_until,
+    reason: profile.block_reason || '',
+  };
+}
+
+// 反馈超时检查（懒执行）：确认收货 7 天内未提交反馈 → 拉黑 3 个月
+export async function checkFeedbackDeadline(userId: string): Promise<void> {
+  const supabase = createClient();
+
+  // 找到该用户所有已接受、物品已完成、但还没写反馈的申领
+  const { data: apps } = await supabase
+    .from('applications')
+    .select(`
+      id,
+      item_id,
+      applicant_id,
+      item:items!inner(id, status, updated_at, title)
+    `)
+    .eq('applicant_id', userId)
+    .eq('status', 'accepted')
+    .eq('item.status', 'completed');
+
+  if (!apps || apps.length === 0) return;
+
+  for (const app of apps) {
+    const item = Array.isArray(app.item) ? app.item[0] : app.item;
+    if (!item) continue;
+
+    // 是否已提交反馈
+    const { data: existing } = await supabase
+      .from('feedback')
+      .select('id')
+      .eq('item_id', app.item_id)
+      .eq('applicant_id', userId)
+      .maybeSingle();
+    if (existing) continue;
+
+    // 以物品 completed 时间（updated_at）为起点，7 天未反馈 → 拉黑
+    const completedAt = new Date(item.updated_at);
+    const daysPassed = (Date.now() - completedAt.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysPassed > 7) {
+      await recordTrustEvent({
+        userId,
+        eventType: 'feedback_late',
+        scoreChange: 0,
+        blockDuration: '3m',
+        description: `超过 7 天未提交「${item.title}」的使用反馈`,
+        relatedItemId: app.item_id,
+      });
+    }
+  }
+}
+
 // ===== 反馈模块（新增/修改）=====
 
 // getItemById 别名（供反馈页使用）
@@ -515,6 +772,64 @@ export async function createFeedback(data: {
     .from('items')
     .update({ status: 'completed' })
     .eq('id', data.itemId);
+
+  // ===== 信用体系：按时反馈加分 + 闭环计数 =====
+  try {
+    // 判断是否按时（以确认收货时间为起点，7 天内算按时）
+    const { data: item } = await supabase
+      .from('items')
+      .select('title, updated_at')
+      .eq('id', data.itemId)
+      .single();
+
+    const completedAt = item?.updated_at ? new Date(item.updated_at) : new Date();
+    const daysPassed = (Date.now() - completedAt.getTime()) / (1000 * 60 * 60 * 24);
+    const onTime = daysPassed <= 7;
+
+    await recordTrustEvent({
+      userId: data.applicantId,
+      eventType: onTime ? 'feedback_on_time' : 'feedback_late',
+      scoreChange: onTime ? 10 : 0,
+      description: onTime
+        ? `按时提交「${item?.title || ''}」的使用反馈`
+        : `超时提交「${item?.title || ''}」的反馈（超过 7 天）`,
+      relatedItemId: data.itemId,
+    });
+
+    // 完成闭环 +1（申领者）
+    const { data: appProfile } = await supabase
+      .from('profiles')
+      .select('completed_cycles')
+      .eq('id', data.applicantId)
+      .single();
+    if (appProfile) {
+      await supabase
+        .from('profiles')
+        .update({
+          completed_cycles: (appProfile.completed_cycles || 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', data.applicantId);
+    }
+
+    // 成功赠送 +1（赠主）
+    const { data: giverProfile } = await supabase
+      .from('profiles')
+      .select('total_given')
+      .eq('id', data.giverId)
+      .single();
+    if (giverProfile) {
+      await supabase
+        .from('profiles')
+        .update({
+          total_given: (giverProfile.total_given || 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', data.giverId);
+    }
+  } catch (trustErr) {
+    console.error('trust event error:', trustErr);
+  }
 
   return { id: fb.id };
 }
@@ -593,6 +908,25 @@ export async function rateFeedback(
         .update({ red_flowers: (current.red_flowers || 0) + 1 })
         .eq('id', giverId);
     }
+
+    // 优质反馈：申领者信用分 +15
+    await recordTrustEvent({
+      userId: applicantId,
+      eventType: 'feedback_good',
+      scoreChange: 15,
+      description: '反馈质量获得赠主认可',
+      relatedItemId: itemId,
+    });
+  } else if (quality === 'poor') {
+    // 敷衍反馈：拉黑 3 个月
+    await recordTrustEvent({
+      userId: applicantId,
+      eventType: 'feedback_poor',
+      scoreChange: 0,
+      blockDuration: '3m',
+      description: '赠主反馈你的感谢信敷衍，经平台复核确认',
+      relatedItemId: itemId,
+    });
   }
 }
 
@@ -756,6 +1090,26 @@ export async function declineAcceptance(itemId: string, applicationId: string): 
 }
 
 // ===== getDashboardStats =====
+
+// 获取赠主收到的公开感谢信（个人主页展示用）
+export async function getPublicFeedbackForGiver(giverId: string): Promise<Feedback[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('feedback')
+    .select(`
+      *,
+      applicant:profiles(*),
+      item:items(id, title),
+      images:feedback_images(*)
+    `)
+    .eq('giver_id', giverId)
+    .eq('is_public', true)
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (error) return [];
+  return (data || []) as Feedback[];
+}
 
 export async function getDashboardStats(userId: string) {
   const supabase = createClient();

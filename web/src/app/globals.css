@@ -57,3 +57,74 @@
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* ===== 视觉改版新增 ===== */
+
+/* 入场动画 */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-up-delay-1 {
+  animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+.animate-fade-up-delay-2 {
+  animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+}
+
+.animate-fade-up-delay-3 {
+  animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+}
+
+/* 悬浮装饰动画 */
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float-soft {
+  animation: float-soft 4s ease-in-out infinite;
+}
+
+/* 文本选中色 */
+::selection {
+  background: rgba(232, 93, 58, 0.18);
+  color: var(--color-warm-900);
+}
+
+/* 优雅滚动条 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-warm-50);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-warm-200);
+  border-radius: 6px;
+  border: 2px solid var(--color-warm-50);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-warm-300);
+}

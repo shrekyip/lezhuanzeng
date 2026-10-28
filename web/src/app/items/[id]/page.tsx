@@ -14,6 +14,7 @@ import {
   confirmShipment,
   confirmReceipt,
   declineAcceptance,
+  isUserBlocked,
 } from "@/lib/db";
 import type { Item, Application, Profile } from "@/types";
 
@@ -34,6 +35,7 @@ export default function ItemDetailPage() {
   const [selecting, setSelecting] = useState<string | null>(null); // applicationId being selected
   const [trackingNumber, setTrackingNumber] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [blockInfo, setBlockInfo] = useState<{ blocked: boolean; until: string | null; reason: string } | null>(null);
 
   // 获取当前用户作为申领者的被接受申领
   const myAcceptedApp = applications.find(
@@ -54,6 +56,9 @@ export default function ItemDetailPage() {
         if (found.status === 'completed') {
           setFeedback(await getFeedbackForItem(found.id));
         }
+      }
+      if (user) {
+        setBlockInfo(await isUserBlocked(user.id));
       }
       setLoading(false);
     };
@@ -118,9 +123,9 @@ export default function ItemDetailPage() {
       });
       setApplySubmitted(true);
       setApplications(await getApplicationsForItem(item.id));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Apply error:', err);
-      alert('申领失败，请稍后重试');
+      alert(err?.message || '申领失败，请稍后重试');
     }
     setSubmitting(false);
   };
@@ -221,7 +226,12 @@ export default function ItemDetailPage() {
             <div className="w-6 h-6 rounded-full bg-neutral-200 text-neutral-500 text-[10px] flex items-center justify-center font-medium">
               {item.giver?.nickname?.[0] || "?"}
             </div>
-            <span>{item.giver?.nickname}</span>
+            <Link
+              href={`/profile/${item.giver_id}`}
+              className="hover:text-primary transition-colors"
+            >
+              {item.giver?.nickname}
+            </Link>
             {item.city && (
               <>
                 <span className="text-neutral-300">·</span>
@@ -346,6 +356,18 @@ export default function ItemDetailPage() {
                 </p>
               )}
             </div>
+          ) : blockInfo?.blocked ? (
+            <div className="bg-red-50 rounded-xl p-4 text-center">
+              <p className="text-sm text-red-700 font-medium">
+                🚫 账号当前被限制申领
+              </p>
+              <p className="text-xs text-red-500 mt-1">
+                {blockInfo.until
+                  ? `限制期至 ${new Date(blockInfo.until).toLocaleDateString('zh-CN')}`
+                  : '永久限制'}
+                {blockInfo.reason ? ` · 原因：${blockInfo.reason}` : ''}
+              </p>
+            </div>
           ) : hasApplied || applySubmitted ? (
             <div className="bg-green-50 rounded-xl p-4 text-center">
               <p className="text-sm text-green-700 font-medium">
@@ -456,9 +478,12 @@ export default function ItemDetailPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-sm font-medium text-neutral-900">
+                      <Link
+                        href={`/profile/${app.applicant_id}`}
+                        className="text-sm font-medium text-neutral-900 hover:text-primary transition-colors"
+                      >
                         {app.applicant?.nickname}
-                      </p>
+                      </Link>
                       {app.status === 'accepted' && (
                         <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✓ 已选中</span>
                       )}

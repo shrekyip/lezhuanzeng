@@ -84,6 +84,7 @@ export interface Feedback {
   created_at?: string;
   is_public?: boolean;
   applicant?: Profile;
+  item?: Item | { id: string; title: string };
   images?: FeedbackImage[];
 }
 

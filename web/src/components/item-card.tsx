@@ -10,7 +10,7 @@ export default function ItemCard({ item }: { item: Item }) {
   return (
     <Link
       href={`/items/${item.id}`}
-      className="group block bg-white rounded-xl border border-neutral-100 overflow-hidden hover:shadow-md hover:border-neutral-200 transition-all duration-200"
+      className="group block bg-white rounded-xl border border-warm-100 overflow-hidden hover:shadow-warm-md hover:border-warm-200 hover:-translate-y-0.5 transition-all duration-200"
     >
       {/* Image */}
       <div className="aspect-[3/2] bg-neutral-100 relative overflow-hidden">
@@ -21,7 +21,7 @@ export default function ItemCard({ item }: { item: Item }) {
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-4xl text-neutral-300">
+          <div className="w-full h-full flex items-center justify-center text-4xl bg-gradient-to-br from-warm-100 to-warm-200/50">
             📦
           </div>
         )}
@@ -41,8 +41,12 @@ export default function ItemCard({ item }: { item: Item }) {
 
         <div className="flex items-center justify-between mt-3 pt-2 border-t border-neutral-50">
           <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-full bg-neutral-200 text-neutral-500 text-[9px] flex items-center justify-center font-medium">
-              {item.giver?.nickname?.[0] || "?"}
+            <div className="w-5 h-5 rounded-full bg-warm-200 text-warm-600 text-[9px] flex items-center justify-center font-medium overflow-hidden">
+              {item.giver?.avatar_url ? (
+                <img src={item.giver.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                item.giver?.nickname?.[0] || "?"
+              )}
             </div>
             <span className="text-xs text-neutral-500">
               {item.giver?.nickname}

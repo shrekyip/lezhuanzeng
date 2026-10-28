@@ -117,10 +117,14 @@ export default function Navbar() {
         <div className="relative">
           <button
             onClick={() => setShowSwitcher(!showSwitcher)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-neutral-200 hover:border-neutral-300 transition-colors text-sm"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-warm-200 hover:border-warm-300 bg-white/60 transition-colors text-sm"
           >
-            <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center">
-              {user.nickname[0]}
+            <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center overflow-hidden">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                user.nickname[0]
+              )}
             </div>
             <span className="text-neutral-700">{user.nickname}</span>
             {isAuth && (
@@ -157,6 +161,13 @@ export default function Navbar() {
                     onClick={() => setShowSwitcher(false)}
                   >
                     📋 我的物品
+                  </Link>
+                  <Link
+                    href="/settings"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors"
+                    onClick={() => setShowSwitcher(false)}
+                  >
+                    ⚙️ 编辑资料
                   </Link>
                   <button
                     onClick={handleSignOut}

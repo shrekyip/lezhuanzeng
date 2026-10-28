@@ -51,17 +51,21 @@ export default function Home() {
   return (
     <>
       {/* Section 1: Hero - 情感钩子 */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-warm-50 via-white to-warm-100">
-        <div className="max-w-6xl mx-auto px-4 py-20 md:py-28 lg:flex lg:items-center lg:gap-12">
+      <section className="relative overflow-hidden bg-gradient-to-br from-warm-50 via-white to-primary-light/40">
+        {/* 装饰背景 */}
+        <div className="absolute top-[-120px] right-[-120px] w-96 h-96 rounded-full bg-primary-light/60 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-[-100px] left-[-80px] w-80 h-80 rounded-full bg-accent-light/50 blur-3xl pointer-events-none" />
+
+        <div className="relative max-w-6xl mx-auto px-4 py-20 md:py-28 lg:flex lg:items-center lg:gap-12">
           {/* 文案 */}
           <div className="max-w-xl">
-            <h1 className="text-4xl md:text-5xl font-bold text-warm-900 leading-tight">
+            <h1 className="text-4xl md:text-5xl font-bold text-warm-900 leading-tight animate-fade-up">
               把不再用的好东西，
               <br />
               <span className="text-primary">送给真正需要的人</span>
             </h1>
-            
-            <p className="mt-6 text-lg text-warm-700 leading-relaxed">
+
+            <p className="mt-6 text-lg text-warm-700 leading-relaxed animate-fade-up-delay-1">
               不是二手交易，是一次有温度的赠与。
               <br />
               你会收到对方的使用照片和手写信——
@@ -69,34 +73,48 @@ export default function Home() {
               <span className="font-medium text-warm-800">那种满足感，比买新东西持久得多。</span>
             </p>
 
-            <div className="mt-8 flex flex-wrap gap-4">
+            <div className="mt-8 flex flex-wrap gap-4 animate-fade-up-delay-2">
               <Link
                 href="/items/new"
-                className="inline-flex items-center justify-center rounded-full bg-primary px-8 py-3.5 text-base font-medium text-white hover:bg-primary-dark shadow-warm-md hover:shadow-warm-lg transition-all"
+                className="inline-flex items-center justify-center rounded-full bg-primary px-8 py-3.5 text-base font-medium text-white hover:bg-primary-dark shadow-warm-md hover:shadow-warm-lg hover:-translate-y-0.5 transition-all"
               >
                 我要赠与
               </Link>
               <Link
                 href="/browse"
-                className="inline-flex items-center justify-center rounded-full border-2 border-warm-300 px-8 py-3.5 text-base font-medium text-warm-700 hover:bg-warm-100 transition-colors"
+                className="inline-flex items-center justify-center rounded-full border-2 border-warm-300 bg-white/60 px-8 py-3.5 text-base font-medium text-warm-700 hover:bg-warm-100 hover:-translate-y-0.5 transition-all"
               >
                 我需要
               </Link>
             </div>
 
-            <p className="mt-6 text-sm text-warm-500">
-              ✨ 已有 <span className="font-semibold text-primary">{stats.totalCompleted || '—'}</span> 件物品找到新主人
-            </p>
+            {/* 数据统计 */}
+            <div className="mt-10 flex gap-8 animate-fade-up-delay-3">
+              <div>
+                <p className="text-2xl font-bold text-warm-900">{stats.totalItems || '—'}</p>
+                <p className="text-xs text-warm-500 mt-0.5">物品在赠</p>
+              </div>
+              <div className="w-px bg-warm-200" />
+              <div>
+                <p className="text-2xl font-bold text-warm-900">{stats.totalUsers || '—'}</p>
+                <p className="text-xs text-warm-500 mt-0.5">社区成员</p>
+              </div>
+              <div className="w-px bg-warm-200" />
+              <div>
+                <p className="text-2xl font-bold text-primary">{stats.totalCompleted || '—'}</p>
+                <p className="text-xs text-warm-500 mt-0.5">温暖闭环</p>
+              </div>
+            </div>
           </div>
 
           {/* 右侧视觉元素 - 模拟照片墙 */}
           <div className="hidden lg:block lg:w-1/2 mt-12 lg:mt-0">
             <div className="relative">
               {/* 主图 */}
-              <div className="rounded-2xl overflow-hidden shadow-warm-lg">
-                <div className="aspect-[4/3] bg-warm-200 flex items-center justify-center">
+              <div className="rounded-3xl overflow-hidden shadow-warm-lg">
+                <div className="aspect-[4/3] bg-gradient-to-br from-primary-light via-warm-100 to-accent-light flex items-center justify-center">
                   <div className="text-center">
-                    <div className="text-6xl mb-4">🎁</div>
+                    <div className="text-7xl mb-4 animate-float-soft">🎁</div>
                     <p className="text-warm-600 font-medium">温暖的赠与瞬间</p>
                   </div>
                 </div>
@@ -131,8 +149,8 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-8">
             {/* Step 1 */}
             <div className="text-center">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-warm-100 flex items-center justify-center text-3xl mb-4">
-                1️⃣
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-warm-100 flex items-center justify-center mb-4 shadow-warm-sm">
+                <span className="text-2xl font-bold text-warm-600">1</span>
               </div>
               <h3 className="text-lg font-semibold text-warm-800 mb-2">
                 发布高价值物品
@@ -146,8 +164,8 @@ export default function Home() {
 
             {/* Step 2 */}
             <div className="text-center">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-primary-light flex items-center justify-center text-3xl mb-4">
-                2️⃣
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-primary-light flex items-center justify-center mb-4 shadow-warm-sm">
+                <span className="text-2xl font-bold text-primary">2</span>
               </div>
               <h3 className="text-lg font-semibold text-warm-800 mb-2">
                 选择最需要的申领者
@@ -161,8 +179,8 @@ export default function Home() {
 
             {/* Step 3 */}
             <div className="text-center">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-accent-light flex items-center justify-center text-3xl mb-4">
-                3️⃣
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-accent-light flex items-center justify-center mb-4 shadow-warm-sm">
+                <span className="text-2xl font-bold text-accent">3</span>
               </div>
               <h3 className="text-lg font-semibold text-warm-800 mb-2">
                 收到使用照片 + 感谢信
